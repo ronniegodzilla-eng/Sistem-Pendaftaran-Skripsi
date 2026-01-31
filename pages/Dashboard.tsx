@@ -137,7 +137,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
                   <h3 className="text-red-800 font-bold flex items-center gap-2">
-                      <AlertTriangle size={20} /> Peringatan Revisi (>7 Hari)
+                      <AlertTriangle size={20} /> Peringatan Revisi (&gt;7 Hari)
                   </h3>
                   <span className="bg-red-200 text-red-800 text-xs px-2 py-1 rounded-full font-bold">
                       {overdueRevisions.length} Mahasiswa
