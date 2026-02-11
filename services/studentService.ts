@@ -3,7 +3,9 @@ import { supabase } from './supabase';
 import { Student } from '../types';
 import * as XLSX from 'xlsx';
 
-// Raw CSV Data provided by the user (Initial Data) - Kept for initial mock data loading
+// Update version key to ensure fresh logic applies
+const STORAGE_KEY_STUDENTS = 'app_students_master_v5';
+
 const RAW_CSV_DATA = `Nama,NPM,Prodi,Judul Skripsi,Pembimbing 1,Pembimbing 2,Penguji 1,Penguji 2
 Naily Nur Suliana,K3-2025-001,K3,-,Dosen P1,Dosen P2,Dosen U1,Dosen U2
 Lucy Normayna .N.,K3-2025-002,K3,-,Dosen P1,Dosen P2,Dosen U1,Dosen U2
@@ -189,152 +191,231 @@ M. FIKRI BIL KHAIRI,211013251026,Kesling,-,Dosen P1,Dosen P2,Dosen U1,Dosen U2
 SAMSUL MA'RIF,211013251037,Kesling,-,Dosen P1,Dosen P2,Dosen U1,Dosen U2
 HERLINA,231013251031,Kesling,-,Dosen P1,Dosen P2,Dosen U1,Dosen U2`;
 
-// Parse CSV once on load
 const parseCSV = (csv: string): Student[] => {
-  const lines = csv.split('\n').filter(line => line.trim() !== '');
-  // Skip header row
-  const dataLines = lines.slice(1);
-  
-  return dataLines.map(line => {
-    // Basic CSV parse (assuming no commas in fields for simplicity)
-    const [Nama, NPM, Prodi, Judul, P1, P2, U1, U2] = line.split(',');
-    return {
-      nama: Nama?.trim() || '',
-      npm: NPM?.trim() || '',
-      prodi: Prodi?.trim() || '',
-      judul_skripsi: Judul?.trim() || '-',
-      pembimbing_1: P1?.trim() || '',
-      pembimbing_2: P2?.trim() || '',
-      penguji_1: U1?.trim() || '',
-      penguji_2: U2?.trim() || '',
-    };
-  });
-};
-
-// Parse XLSX Data
-export const parseExcel = (data: ArrayBuffer): Student[] => {
-    const workbook = XLSX.read(data, { type: 'array' });
-    const firstSheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[firstSheetName];
-    
-    // Convert to JSON with header: 1 (array of arrays)
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-    
-    // Skip header row
-    const dataRows = jsonData.slice(1);
-    
-    // Map assuming fixed column order: Nama, NPM, Prodi, Judul, P1, P2, U1, U2
-    return dataRows.map(row => {
+    const lines = csv.split('\n').filter(l => l.trim());
+    const data = lines.slice(1).map(line => {
+        const cols = line.split(',');
         return {
-            nama: row[0]?.toString().trim() || '',
-            npm: row[1]?.toString().trim() || '',
-            prodi: row[2]?.toString().trim() || '',
-            judul_skripsi: row[3]?.toString().trim() || '-',
-            pembimbing_1: row[4]?.toString().trim() || '',
-            pembimbing_2: row[5]?.toString().trim() || '',
-            penguji_1: row[6]?.toString().trim() || '',
-            penguji_2: row[7]?.toString().trim() || '',
-        };
-    }).filter(s => s.nama !== '' || s.npm !== ''); // Simple filter for empty rows
+            nama: cols[0]?.trim() || '',
+            npm: cols[1]?.trim() || '',
+            prodi: cols[2]?.trim() || '',
+            judul_skripsi: cols[3]?.trim() || '-',
+            pembimbing_1: cols[4]?.trim() || '',
+            pembimbing_2: cols[5]?.trim() || '',
+            penguji_1: cols[6]?.trim() || '',
+            penguji_2: cols[7]?.trim() || ''
+        } as Student;
+    });
+    return data;
 };
 
-// Download Excel Template
-export const downloadExcelTemplate = () => {
-    const headers = ["Nama", "NPM", "Prodi", "Judul Skripsi", "Pembimbing 1", "Pembimbing 2", "Penguji 1", "Penguji 2"];
-    const ws = XLSX.utils.aoa_to_sheet([headers]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "template_mahasiswa.xlsx");
+// Internal Cache
+let cachedStudents: Student[] | null = null;
+
+const loadStudentsFromStorage = (): Student[] => {
+    if (typeof window === 'undefined') return [];
+    
+    // Check if new version key exists
+    const stored = localStorage.getItem(STORAGE_KEY_STUDENTS);
+    if (stored) return JSON.parse(stored);
+    
+    // Fallback to RAW_CSV_DATA
+    const initial = parseCSV(RAW_CSV_DATA);
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(initial));
+    return initial;
 };
 
-// Mutable Database for this session
-let MOCK_DB_STUDENTS = parseCSV(RAW_CSV_DATA);
+const saveStudentsToStorage = (students: Student[]) => {
+    localStorage.setItem(STORAGE_KEY_STUDENTS, JSON.stringify(students));
+    cachedStudents = students;
+};
 
 export const getAllStudents = async (): Promise<Student[]> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return [...MOCK_DB_STUDENTS];
+    // 1. Try Supabase
+    if (supabase) {
+        const { data, error } = await supabase.from('students').select('*');
+        if (!error && data && data.length > 0) {
+            cachedStudents = data as Student[];
+            saveStudentsToStorage(cachedStudents);
+            return cachedStudents;
+        }
+    }
+
+    // 2. Use Local Storage / Cache
+    if (!cachedStudents) {
+        cachedStudents = loadStudentsFromStorage();
+    }
+    
+    return new Promise(resolve => setTimeout(() => resolve(cachedStudents || []), 300));
 };
 
-export const updateStudent = async (npm: string, updatedData: Partial<Student>): Promise<boolean> => {
-    const index = MOCK_DB_STUDENTS.findIndex(s => s.npm === npm);
-    if (index !== -1) {
-        MOCK_DB_STUDENTS[index] = { ...MOCK_DB_STUDENTS[index], ...updatedData };
-        return true;
+export const getStudentByNPM = async (npm: string): Promise<Student | null> => {
+    const all = await getAllStudents();
+    return all.find(s => s.npm === npm) || null;
+};
+
+export const searchStudentsByName = async (name: string): Promise<Student[]> => {
+    const all = await getAllStudents();
+    const term = name.toLowerCase();
+    return all.filter(s => s.nama.toLowerCase().includes(term) || s.npm.includes(term));
+};
+
+export const addStudent = async (student: Student): Promise<{ success: boolean; message: string }> => {
+    const all = await getAllStudents();
+    if (all.some(s => s.npm === student.npm)) {
+        return { success: false, message: 'NPM sudah terdaftar!' };
     }
-    return false;
+    
+    all.push(student);
+    saveStudentsToStorage(all);
+
+    if (supabase) {
+        await supabase.from('students').insert(student);
+    }
+    return { success: true, message: 'Berhasil menambah data mahasiswa.' };
+};
+
+export const updateStudent = async (npm: string, data: Student): Promise<void> => {
+    const all = await getAllStudents();
+    const index = all.findIndex(s => s.npm === npm);
+    if (index >= 0) {
+        all[index] = data;
+        saveStudentsToStorage(all);
+
+        if (supabase) {
+            await supabase.from('students').update(data).eq('npm', npm);
+        }
+    }
 };
 
 export const deleteStudents = async (npms: string[]): Promise<void> => {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 200));
-    MOCK_DB_STUDENTS = MOCK_DB_STUDENTS.filter(s => !npms.includes(s.npm));
+    const all = await getAllStudents();
+    const filtered = all.filter(s => !npms.includes(s.npm));
+    saveStudentsToStorage(filtered);
+
+    if (supabase) {
+        await supabase.from('students').delete().in('npm', npms);
+    }
 };
 
-export const restoreStudents = async (studentsToRestore: Student[]): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    // Simple restore: add them back. Check duplication by NPM just in case.
-    const existingNpmSet = new Set(MOCK_DB_STUDENTS.map(s => s.npm));
-    const newOnes = studentsToRestore.filter(s => !existingNpmSet.has(s.npm));
-    MOCK_DB_STUDENTS = [...MOCK_DB_STUDENTS, ...newOnes];
-}
+export const restoreStudents = async (students: Student[]): Promise<void> => {
+    const all = await getAllStudents();
+    // Add only if not exists
+    const toAdd = students.filter(s => !all.some(exist => exist.npm === s.npm));
+    const merged = [...all, ...toAdd];
+    saveStudentsToStorage(merged);
 
-// Smart Import: Only fill empty fields
-export const importStudents = async (newStudents: Student[]): Promise<{added: number, updated: number}> => {
+    if (supabase && toAdd.length > 0) {
+        await supabase.from('students').insert(toAdd);
+    }
+};
+
+// EXCEL HELPERS
+export const parseExcel = (buffer: ArrayBuffer): Student[] => {
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    
+    // Use json to get raw data, we will map it manually to ensure key safety
+    const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
+
+    // Helper to safely convert to string and trim
+    const safeStr = (val: any) => (val === undefined || val === null) ? '' : String(val).trim();
+
+    // Map fields with multiple possible header names to handle "Judul" vs "Judul Skripsi"
+    return jsonData.map((row: any) => ({
+        nama: safeStr(row['Nama'] || row['nama'] || row['NAMA']),
+        npm: safeStr(row['NPM'] || row['npm'] || row['Nim'] || row['NIM']),
+        prodi: safeStr(row['Prodi'] || row['prodi'] || row['Jurusan']) || 'K3',
+        judul_skripsi: safeStr(row['Judul Skripsi'] || row['Judul'] || row['judul']),
+        pembimbing_1: safeStr(row['Pembimbing 1'] || row['P1'] || row['p1']),
+        pembimbing_2: safeStr(row['Pembimbing 2'] || row['P2'] || row['p2']),
+        penguji_1: safeStr(row['Penguji 1'] || row['U1'] || row['u1']),
+        penguji_2: safeStr(row['Penguji 2'] || row['U2'] || row['u2'])
+    }));
+};
+
+export const importStudents = async (newStudents: Student[]): Promise<{ added: number; updated: number }> => {
+    // 1. Get freshest data
+    let all = await getAllStudents(); 
     let added = 0;
     let updated = 0;
 
-    newStudents.forEach(newStu => {
-        if (!newStu.npm) return;
+    newStudents.forEach(excelStudent => {
+        // Normalize inputs
+        const excelNpm = String(excelStudent.npm || '').trim();
+        const excelName = String(excelStudent.nama || '').trim();
         
-        const existingIndex = MOCK_DB_STUDENTS.findIndex(s => s.npm === newStu.npm);
-        
-        if (existingIndex === -1) {
-            // New student
-            MOCK_DB_STUDENTS.push(newStu);
-            added++;
+        if (!excelNpm && !excelName) return; // Skip empty rows
+
+        // STRATEGY: 
+        // We iterate the EXCEL list (source of truth).
+        // For each Excel row, we search the DB to see if it needs update or insert.
+        // This makes the process independent of Excel sorting order.
+
+        // 1. Try finding by NPM (Exact ID match)
+        // We search the entire 'all' array. This is O(N) per row, ensuring sort order doesn't matter.
+        let existingIndex = all.findIndex(s => 
+            String(s.npm).trim().toLowerCase() === excelNpm.toLowerCase() && excelNpm !== ''
+        );
+
+        // 2. If not found by NPM, try finding by Name (Exact Name match)
+        // This handles the case where the user CHANGED the NPM in Excel.
+        if (existingIndex === -1 && excelName) {
+            existingIndex = all.findIndex(s => 
+                String(s.nama).trim().toLowerCase() === excelName.toLowerCase()
+            );
+        }
+
+        if (existingIndex !== -1) {
+            // UPDATE EXISTING
+            // We overwrite ALL fields from Excel to DB
+            all[existingIndex] = {
+                ...all[existingIndex], // Keep DB fields (like hidden IDs if any)
+                ...excelStudent,       // Overwrite with Excel data
+                npm: excelNpm,         // Ensure normalized NPM
+                nama: excelName        // Ensure normalized Name
+            };
+            updated++;
         } else {
-            // Merge logic: Only update if existing is empty/dash and new has value
-            const existing = MOCK_DB_STUDENTS[existingIndex];
-            let hasChange = false;
-            
-            // Helper to check emptiness
-            const isEmpty = (val: string) => !val || val.trim() === '' || val.trim() === '-';
-
-            const merged = { ...existing };
-            
-            (Object.keys(newStu) as Array<keyof Student>).forEach(key => {
-                if (isEmpty(merged[key]) && !isEmpty(newStu[key])) {
-                    merged[key] = newStu[key];
-                    hasChange = true;
-                }
-            });
-
-            if (hasChange) {
-                MOCK_DB_STUDENTS[existingIndex] = merged;
-                updated++;
-            }
+            // INSERT NEW
+            all.push(excelStudent);
+            added++;
         }
     });
+
+    saveStudentsToStorage(all);
+    if (supabase) await supabase.from('students').upsert(all);
 
     return { added, updated };
 };
 
-export const getStudentByNPM = async (npm: string): Promise<Student | null> => {
-  // Simulate network delay for realism
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  const found = MOCK_DB_STUDENTS.find(s => s.npm.toLowerCase() === npm.toLowerCase());
-  return found || null;
-};
+export const downloadExcelTemplate = (existingData?: Student[]) => {
+    const data = existingData && existingData.length > 0 ? existingData : [
+        {
+            nama: 'Contoh Nama',
+            npm: 'Contoh NPM',
+            prodi: 'K3',
+            judul_skripsi: 'Contoh Judul',
+            pembimbing_1: 'Nama Dosen',
+            pembimbing_2: 'Nama Dosen',
+            penguji_1: 'Nama Dosen',
+            penguji_2: 'Nama Dosen'
+        }
+    ];
 
-export const searchStudentsByName = async (nameQuery: string): Promise<Student[]> => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 200));
-  
-  const lowerQuery = nameQuery.toLowerCase();
-  return MOCK_DB_STUDENTS.filter(s => s.nama.toLowerCase().includes(lowerQuery)).slice(0, 10);
-};
+    const ws = XLSX.utils.json_to_sheet(data.map(s => ({
+        'Nama': s.nama,
+        'NPM': s.npm,
+        'Prodi': s.prodi,
+        'Judul Skripsi': s.judul_skripsi,
+        'Pembimbing 1': s.pembimbing_1,
+        'Pembimbing 2': s.pembimbing_2,
+        'Penguji 1': s.penguji_1,
+        'Penguji 2': s.penguji_2
+    })));
 
-// Export parser for Import feature
-export { parseCSV };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data Mahasiswa");
+    XLSX.writeFile(wb, "Template_Data_Mahasiswa.xlsx");
+};
