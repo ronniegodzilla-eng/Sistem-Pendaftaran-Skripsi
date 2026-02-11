@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../services/mockDb';
-import { getAllStudents, updateStudent, deleteStudents, restoreStudents, importStudents, parseExcel, downloadExcelTemplate } from '../services/studentService';
+import { getAllStudents, updateStudent, addStudent, deleteStudents, restoreStudents, importStudents, parseExcel, downloadExcelTemplate } from '../services/studentService';
 import { getDriveConfig, saveDriveConfig, isDriveConfigured } from '../services/driveService';
 import { FileRequirement, Student, Submission, Schedule } from '../types';
 import { Save, Plus, Trash2, Edit2, Upload, Search, Database, FileText, Check, Download, Cloud, ExternalLink, AlertTriangle, Copy, Code, HelpCircle, Info, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, X, RotateCcw } from 'lucide-react';
@@ -21,7 +20,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onDataChange }) =>
   // --- Database State ---
   const [students, setStudents] = useState<Student[]>([]);
   const [dbSearch, setDbSearch] = useState('');
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  
+  // Student Modal State (Add or Edit)
+  const [studentModalData, setStudentModalData] = useState<Student | null>(null);
+  const [isAddingNewStudent, setIsAddingNewStudent] = useState(false);
+  const [editingOriginalNpm, setEditingOriginalNpm] = useState<string | null>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importStats, setImportStats] = useState<{added: number, updated: number} | null>(null);
   
@@ -189,14 +193,61 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onDataChange }) =>
       alert("Data mahasiswa berhasil dikembalikan.");
   };
 
-  const startEditStudent = (student: Student) => {
-      setEditingStudent({ ...student });
+  // --- STUDENT MODAL LOGIC (ADD / EDIT) ---
+  const handleManualAdd = () => {
+      setIsAddingNewStudent(true);
+      setEditingOriginalNpm(null);
+      setStudentModalData({
+          nama: '',
+          npm: '',
+          prodi: 'K3', // Default
+          judul_skripsi: '-',
+          pembimbing_1: '',
+          pembimbing_2: '',
+          penguji_1: '',
+          penguji_2: ''
+      });
   };
 
-  const saveEditStudent = async () => {
-      if (editingStudent) {
-          await updateStudent(editingStudent.npm, editingStudent);
-          setEditingStudent(null);
+  const startEditStudent = (student: Student) => {
+      setIsAddingNewStudent(false);
+      setEditingOriginalNpm(student.npm);
+      setStudentModalData({ ...student });
+  };
+
+  const saveStudentModal = async () => {
+      if (!studentModalData) return;
+
+      // Basic Validation
+      if (!studentModalData.npm || !studentModalData.nama) {
+          alert("Nama dan NPM wajib diisi!");
+          return;
+      }
+
+      if (isAddingNewStudent) {
+          const result = await addStudent(studentModalData);
+          if (result.success) {
+              setStudentModalData(null);
+              loadStudents();
+          } else {
+              alert(result.message);
+          }
+      } else {
+          // Update Mode
+          if (editingOriginalNpm) {
+               // Check if NPM changed and collision
+               if (editingOriginalNpm !== studentModalData.npm) {
+                    const isDuplicate = students.some(s => s.npm === studentModalData.npm && s.npm !== editingOriginalNpm);
+                    if (isDuplicate) {
+                         alert(`NPM ${studentModalData.npm} sudah terdaftar!`);
+                         return;
+                    }
+               }
+               
+               await updateStudent(editingOriginalNpm, studentModalData);
+          }
+          setStudentModalData(null);
+          setEditingOriginalNpm(null);
           loadStudents();
       }
   };
@@ -224,7 +275,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onDataChange }) =>
   };
 
   const handleDownloadTemplate = () => {
-      downloadExcelTemplate();
+      // Pass existing students to export full data
+      downloadExcelTemplate(students);
   };
 
   // === RESET PROCESS LOGIC ===
@@ -453,13 +505,19 @@ function doPost(e) {
                     <h3 className="font-bold text-slate-900 flex items-center gap-2"><Database size={20} className="text-indigo-600"/> Data Induk Mahasiswa (Master Data)</h3>
                     <p className="text-xs text-slate-500">Data ini bersifat global. Total Data: {students.length}</p>
                   </div>
-                  <div className="flex gap-2 w-full md:w-auto">
+                  <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                      <button 
+                        onClick={handleManualAdd} 
+                        className="flex items-center justify-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700"
+                      >
+                          <Plus size={18} /> Tambah Manual
+                      </button>
                       <button 
                         onClick={handleDownloadTemplate} 
                         className="flex items-center justify-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 border border-slate-200"
-                        title="Download Template Excel"
+                        title="Download Data sebagai Excel"
                       >
-                          <Download size={18} /> <span className="hidden md:inline">Template</span>
+                          <Download size={18} /> <span className="hidden md:inline">Download Data (Excel)</span>
                       </button>
                       <input 
                         type="file" 
@@ -590,40 +648,60 @@ function doPost(e) {
                   </div>
               </div>
 
-              {/* EDIT MODAL */}
-              {editingStudent && (
+              {/* STUDENT MODAL (ADD / EDIT) */}
+              {studentModalData && (
                   <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                       <div className="bg-white rounded-xl w-full max-w-lg p-6 shadow-xl animate-fade-in-up">
-                          <h3 className="text-lg font-bold text-slate-900 mb-4">Edit Data Mahasiswa</h3>
+                          <h3 className="text-lg font-bold text-slate-900 mb-4">
+                              {isAddingNewStudent ? 'Tambah Data Mahasiswa' : 'Edit Data Mahasiswa'}
+                          </h3>
                           <div className="space-y-3">
                               <div>
                                   <label className="text-xs font-bold text-slate-500">Nama</label>
-                                  <input className="w-full border p-2 rounded" value={editingStudent.nama} onChange={e => setEditingStudent({...editingStudent, nama: e.target.value})} />
+                                  <input 
+                                    className="w-full border p-2 rounded" 
+                                    value={studentModalData.nama} 
+                                    onChange={e => setStudentModalData({...studentModalData, nama: e.target.value})} 
+                                  />
                               </div>
                               <div className="grid grid-cols-2 gap-4">
                                   <div>
                                       <label className="text-xs font-bold text-slate-500">NPM (ID)</label>
-                                      <input className="w-full border p-2 rounded bg-slate-100" value={editingStudent.npm} disabled />
+                                      <input 
+                                        className="w-full border p-2 rounded bg-white" 
+                                        value={studentModalData.npm} 
+                                        onChange={e => setStudentModalData({...studentModalData, npm: e.target.value})}
+                                        placeholder="Contoh: K3-2025-XXX"
+                                      />
                                   </div>
                                   <div>
                                       <label className="text-xs font-bold text-slate-500">Prodi</label>
-                                      <input className="w-full border p-2 rounded" value={editingStudent.prodi} onChange={e => setEditingStudent({...editingStudent, prodi: e.target.value})} />
+                                      <input 
+                                        className="w-full border p-2 rounded" 
+                                        value={studentModalData.prodi} 
+                                        onChange={e => setStudentModalData({...studentModalData, prodi: e.target.value})} 
+                                      />
                                   </div>
                               </div>
                               <div>
                                   <label className="text-xs font-bold text-slate-500">Judul Skripsi</label>
-                                  <textarea className="w-full border p-2 rounded" rows={2} value={editingStudent.judul_skripsi} onChange={e => setEditingStudent({...editingStudent, judul_skripsi: e.target.value})} />
+                                  <textarea 
+                                    className="w-full border p-2 rounded" 
+                                    rows={2} 
+                                    value={studentModalData.judul_skripsi} 
+                                    onChange={e => setStudentModalData({...studentModalData, judul_skripsi: e.target.value})} 
+                                  />
                               </div>
                               <div className="grid grid-cols-2 gap-2">
-                                  <input className="w-full border p-2 rounded text-xs" placeholder="Pembimbing 1" value={editingStudent.pembimbing_1} onChange={e => setEditingStudent({...editingStudent, pembimbing_1: e.target.value})} />
-                                  <input className="w-full border p-2 rounded text-xs" placeholder="Pembimbing 2" value={editingStudent.pembimbing_2} onChange={e => setEditingStudent({...editingStudent, pembimbing_2: e.target.value})} />
-                                  <input className="w-full border p-2 rounded text-xs" placeholder="Penguji 1" value={editingStudent.penguji_1} onChange={e => setEditingStudent({...editingStudent, penguji_1: e.target.value})} />
-                                  <input className="w-full border p-2 rounded text-xs" placeholder="Penguji 2" value={editingStudent.penguji_2} onChange={e => setEditingStudent({...editingStudent, penguji_2: e.target.value})} />
+                                  <input className="w-full border p-2 rounded text-xs" placeholder="Pembimbing 1" value={studentModalData.pembimbing_1} onChange={e => setStudentModalData({...studentModalData, pembimbing_1: e.target.value})} />
+                                  <input className="w-full border p-2 rounded text-xs" placeholder="Pembimbing 2" value={studentModalData.pembimbing_2} onChange={e => setStudentModalData({...studentModalData, pembimbing_2: e.target.value})} />
+                                  <input className="w-full border p-2 rounded text-xs" placeholder="Penguji 1" value={studentModalData.penguji_1} onChange={e => setStudentModalData({...studentModalData, penguji_1: e.target.value})} />
+                                  <input className="w-full border p-2 rounded text-xs" placeholder="Penguji 2" value={studentModalData.penguji_2} onChange={e => setStudentModalData({...studentModalData, penguji_2: e.target.value})} />
                               </div>
                           </div>
                           <div className="flex justify-end gap-2 mt-6">
-                              <button onClick={() => setEditingStudent(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
-                              <button onClick={saveEditStudent} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Simpan</button>
+                              <button onClick={() => setStudentModalData(null)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg">Batal</button>
+                              <button onClick={saveStudentModal} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Simpan</button>
                           </div>
                       </div>
                   </div>
@@ -639,7 +717,7 @@ function doPost(e) {
                       <Cloud className="text-indigo-600"/> Konfigurasi Drive Admin (Via Apps Script)
                   </h2>
                   <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl mb-6">
-                      <h4 className="font-bold text-blue-800 flex items-center gap-2 mb-2"><Info size={18}/> Metode Google Apps Script (Gratis)</h4>
+                      <h4 className="font-bold text-blue-800 flex items-center gap-2"><Info size={18}/> Metode Google Apps Script (Gratis)</h4>
                       <p className="text-sm text-blue-700 mb-2">
                           Agar file tersimpan di <strong>Drive Admin (Anda)</strong> dan bukan mahasiswa, kita menggunakan "Google Apps Script" sebagai jembatan.
                       </p>
