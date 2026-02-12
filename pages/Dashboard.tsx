@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Calendar, Bell, AlertTriangle, Users, Award, BookOpen, Clock, FileWarning, CheckCircle, Loader2 } from 'lucide-react';
+import { Calendar, Bell, AlertTriangle, Users, Award, BookOpen, Clock, FileWarning, CheckCircle, Loader2, ArrowRight, FileText } from 'lucide-react';
 import { PageView, Schedule, Submission } from '../types';
 import { db } from '../services/mockDb';
 
@@ -91,9 +91,31 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           </div>
       </div>
 
+      {/* 2. REGISTRATION CALL TO ACTION */}
+      <div 
+        onClick={() => onNavigate('registration-hub')}
+        className="bg-indigo-600 rounded-xl p-6 shadow-lg flex flex-col md:flex-row items-center justify-between text-white relative overflow-hidden group cursor-pointer hover:shadow-xl transition-all"
+      >
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 bg-white/10 w-40 h-40 rounded-full blur-3xl group-hover:bg-white/20 transition-all"></div>
+          <div className="relative z-10 flex items-center gap-4 mb-4 md:mb-0">
+              <div className="bg-white/20 p-3 rounded-full">
+                  <FileText size={32} className="text-white" />
+              </div>
+              <div className="text-center md:text-left">
+                  <h2 className="text-xl font-bold">Pendaftaran Sidang & Seminar</h2>
+                  <p className="text-indigo-100 text-sm">Ajukan proposal atau skripsi Anda sekarang dengan mudah.</p>
+              </div>
+          </div>
+          <div className="relative z-10">
+              <button className="bg-white text-indigo-600 px-6 py-2.5 rounded-lg font-bold shadow-sm hover:bg-indigo-50 transition-colors flex items-center gap-2">
+                  Daftar Sekarang <ArrowRight size={18} />
+              </button>
+          </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
-          {/* 2. NOTIFIKASI JADWAL TERDEKAT */}
+          {/* 3. NOTIFIKASI JADWAL TERDEKAT */}
           <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-xl shadow-lg p-6 text-white relative overflow-hidden">
               <div className="absolute top-0 right-0 -mt-4 -mr-4 bg-white/10 w-32 h-32 rounded-full blur-2xl"></div>
               <div className="relative z-10">
@@ -133,7 +155,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
               </div>
           </div>
 
-          {/* 3. PERINGATAN REVISI TERLAMBAT */}
+          {/* 4. PERINGATAN REVISI TERLAMBAT */}
           <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
               <div className="bg-red-50 p-4 border-b border-red-100 flex justify-between items-center">
                   <h3 className="text-red-800 font-bold flex items-center gap-2">
