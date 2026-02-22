@@ -4,6 +4,30 @@ import { db } from '../services/mockDb';
 import { Submission } from '../types';
 import { Check, X, Eye, FileText, ChevronDown, ChevronUp, MessageSquare, RotateCcw, CheckCircle2, Loader2 } from 'lucide-react';
 
+const NotesInput = ({ initialNotes, onSave }: { initialNotes: string, onSave: (notes: string) => void }) => {
+    const [notes, setNotes] = useState(initialNotes);
+    
+    useEffect(() => {
+        setNotes(initialNotes);
+    }, [initialNotes]);
+    
+    return (
+        <textarea 
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            onBlur={() => {
+                if (notes !== initialNotes) {
+                    onSave(notes);
+                }
+            }}
+            placeholder="Jelaskan kesalahan pada dokumen ini..."
+            className="w-full p-2 text-sm border border-red-200 rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500 bg-white placeholder-red-200 text-slate-700"
+            rows={2}
+            onClick={(e) => e.stopPropagation()}
+        />
+    );
+};
+
 export const AdminValidation: React.FC = () => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -151,13 +175,9 @@ export const AdminValidation: React.FC = () => {
                                                       <label className="text-xs font-semibold text-red-700 mb-1 block flex items-center gap-1">
                                                           <MessageSquare size={12}/> Alasan Penolakan:
                                                       </label>
-                                                      <textarea 
-                                                          value={validation.notes || ''}
-                                                          onChange={(e) => handleNotesChange(sub.id, req.id, e.target.value)}
-                                                          placeholder="Jelaskan kesalahan pada dokumen ini..."
-                                                          className="w-full p-2 text-sm border border-red-200 rounded-md focus:ring-1 focus:ring-red-500 focus:border-red-500 bg-white placeholder-red-200 text-slate-700"
-                                                          rows={2}
-                                                          onClick={(e) => e.stopPropagation()}
+                                                      <NotesInput 
+                                                          initialNotes={validation.notes || ''}
+                                                          onSave={(notes) => handleNotesChange(sub.id, req.id, notes)}
                                                       />
                                                   </div>
                                               )}
