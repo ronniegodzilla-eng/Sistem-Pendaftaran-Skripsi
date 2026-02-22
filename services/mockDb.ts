@@ -1,7 +1,7 @@
 
-import { Submission, Schedule, FileRequirement } from '../types';
-import { PROPOSAL_REQUIREMENTS, SKRIPSI_REQUIREMENTS, PROPOSAL_REVISION_REQUIREMENTS, SKRIPSI_REVISION_REQUIREMENTS } from '../constants';
-import { supabase } from './supabase';
+import { Submission, Schedule, FileRequirement } from './services/types.ts';
+import { PROPOSAL_REQUIREMENTS, SKRIPSI_REQUIREMENTS, PROPOSAL_REVISION_REQUIREMENTS, SKRIPSI_REVISION_REQUIREMENTS } from './services/constants.ts';
+import { supabase } from './services/supabase.ts';
 
 // This simulates a backend database with Persistence
 class MockDatabase {
