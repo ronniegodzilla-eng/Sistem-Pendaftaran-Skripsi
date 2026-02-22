@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
-import { Upload, CheckCircle, FileText, X, Loader2, ExternalLink } from 'lucide-react';
-import { UploadedFile } from '../types';
+import { Upload, CheckCircle, FileText, X, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
+import { UploadedFile, ValidationItem } from '../types';
 
 interface FileUploadProps {
   id: string;
@@ -12,6 +12,7 @@ interface FileUploadProps {
   onRemove: (id: string) => void;
   required?: boolean;
   isUploading?: boolean;
+  validation?: ValidationItem;
 }
 
 export const FileUpload: React.FC<FileUploadProps> = ({
@@ -23,9 +24,11 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   onUpload,
   onRemove,
   required,
-  isUploading = false
+  isUploading = false,
+  validation
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
+  const isRejected = validation?.isValid === false;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -45,12 +48,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   return (
-    <div className="mb-6">
+    <div className={`mb-6 ${isRejected ? 'p-4 bg-red-50/30 border border-red-200 rounded-xl' : ''}`}>
       <div className="flex items-center justify-between mb-2">
         <label className="block text-sm font-medium text-slate-700">
           {label} {required && <span className="text-red-500">*</span>}
         </label>
-        {uploadedFile && !isUploading && (
+        {uploadedFile && !isUploading && !isRejected && (
           <span className="text-xs flex items-center text-green-600 font-medium bg-green-50 px-2 py-1 rounded-full border border-green-100">
             <img src="https://upload.wikimedia.org/wikipedia/commons/1/12/Google_Drive_icon_%282020%29.svg" className="w-3 h-3 mr-1.5" alt="Drive" />
             Tersimpan di Drive
@@ -62,6 +65,16 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           </span>
         )}
       </div>
+
+      {isRejected && (
+        <div className="mb-4 flex flex-col gap-1 text-red-700 bg-red-50 p-3 rounded-lg border border-red-200">
+            <div className="flex items-center gap-2 font-bold text-sm">
+                <AlertCircle size={16} />
+                Berkas Ditolak
+            </div>
+            <p className="text-sm ml-6">{validation.notes}</p>
+        </div>
+      )}
       
       {!uploadedFile && !isUploading ? (
         <div
@@ -84,13 +97,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({
           </div>
         </div>
       ) : (
-        <div className={`mt-1 flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm ${isUploading ? 'border-blue-200 bg-blue-50/50' : 'border-slate-200'}`}>
+        <div className={`mt-1 flex items-center justify-between p-4 bg-white border rounded-lg shadow-sm ${isUploading ? 'border-blue-200 bg-blue-50/50' : isRejected ? 'border-red-300' : 'border-slate-200'}`}>
           <div className="flex items-center space-x-3 overflow-hidden">
-            <div className={`flex-shrink-0 h-10 w-10 rounded flex items-center justify-center ${isUploading ? 'bg-blue-100' : 'bg-indigo-50'}`}>
+            <div className={`flex-shrink-0 h-10 w-10 rounded flex items-center justify-center ${isUploading ? 'bg-blue-100' : isRejected ? 'bg-red-100' : 'bg-indigo-50'}`}>
               {isUploading ? (
                 <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
               ) : (
-                <FileText className="h-6 w-6 text-indigo-600" />
+                <FileText className={`h-6 w-6 ${isRejected ? 'text-red-600' : 'text-indigo-600'}`} />
               )}
             </div>
             <div className="min-w-0 flex-1">
@@ -114,13 +127,25 @@ export const FileUpload: React.FC<FileUploadProps> = ({
                 <ExternalLink className="h-5 w-5" />
               </a>
             )}
-            <button
-              onClick={() => onRemove(id)}
-              disabled={isUploading}
-              className="ml-2 flex-shrink-0 p-1.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            {isRejected ? (
+              <button
+                type="button"
+                onClick={(e) => { e.preventDefault(); inputRef.current?.click(); }}
+                disabled={isUploading}
+                className="ml-2 px-4 py-1.5 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm"
+              >
+                Perbaiki
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => onRemove(id)}
+                disabled={isUploading}
+                className="ml-2 flex-shrink-0 p-1.5 rounded-full text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
           </div>
         </div>
       )}
