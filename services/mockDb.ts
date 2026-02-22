@@ -119,7 +119,7 @@ class MockDatabase {
       if (supabase) {
           const { data, error } = await supabase.from('submissions').select('*');
           if (!error && data) {
-              if (data.length > 0) return data as unknown as Submission[]; 
+              return data as unknown as Submission[]; 
           }
       }
       
@@ -224,7 +224,7 @@ class MockDatabase {
   async getSchedules(): Promise<Schedule[]> {
       if (supabase) {
           const { data, error } = await supabase.from('schedules').select('*');
-          if (!error && data && data.length > 0) return data as Schedule[];
+          if (!error && data ) return data as Schedule[];
       }
       return new Promise(resolve => setTimeout(() => resolve([...this.schedules]), 300));
   }
