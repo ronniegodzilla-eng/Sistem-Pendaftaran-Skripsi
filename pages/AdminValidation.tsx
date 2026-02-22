@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../services/mockDb';
 import { Submission } from '../types';
-import { Check, X, Eye, FileText, ChevronDown, ChevronUp, MessageSquare, RotateCcw, CheckCircle2, Loader2 } from 'lucide-react';
+import { Check, X, Eye, FileText, ChevronDown, ChevronUp, MessageSquare, RotateCcw, CheckCircle2, Loader2, Clock } from 'lucide-react';
 
 const NotesInput = ({ initialNotes, onSave }: { initialNotes: string, onSave: (notes: string) => void }) => {
     const [notes, setNotes] = useState(initialNotes);
@@ -73,6 +73,20 @@ export const AdminValidation: React.FC = () => {
       return db.getRequirements(sub.type);
   };
 
+  const formatDateGMT7 = (dateString: string | Date) => {
+      const date = new Date(dateString);
+      // Format to GMT+7 (WIB)
+      return new Intl.DateTimeFormat('id-ID', {
+          timeZone: 'Asia/Jakarta',
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+      }).format(date) + ' WIB';
+  };
+
   if (loading && submissions.length === 0) {
       return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-indigo-600" /></div>;
   }
@@ -102,6 +116,9 @@ export const AdminValidation: React.FC = () => {
                               <div>
                                   <h3 className="font-bold text-slate-900">{sub.studentName}</h3>
                                   <p className="text-sm text-slate-500">{sub.studentNpm} • <span className="uppercase">{sub.type}</span></p>
+                                  <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                                      <Clock size={12} /> {formatDateGMT7(sub.submittedAt)}
+                                  </p>
                               </div>
                           </div>
                           <div className="flex items-center space-x-4">
