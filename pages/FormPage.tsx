@@ -123,6 +123,14 @@ export const FormPage: React.FC<FormPageProps> = ({
           driveUrl: driveResult.webViewLink
         }
       }));
+      
+      // Hapus status validasi (ditolak) jika mahasiswa mengupload file baru
+      setValidations(prev => {
+        const newVals = { ...prev };
+        delete newVals[id];
+        return newVals;
+      });
+      
     } catch (error) {
       console.error("Upload failed", error);
       alert("Gagal mengupload ke Google Drive. Silakan coba lagi.");
@@ -260,26 +268,16 @@ export const FormPage: React.FC<FormPageProps> = ({
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6 space-y-4">
               {requirements.map((req) => {
-                  const isRejected = validations[req.id]?.isValid === false;
                   return (
-                    <div key={req.id}>
-                        {isRejected && (
-                             <div className="mb-2 flex flex-col gap-1 text-red-700 bg-red-50 p-3 rounded-lg border border-red-100">
-                                <div className="flex items-center gap-2 font-bold text-sm">
-                                    <AlertCircle size={16} />
-                                    Berkas Ditolak
-                                </div>
-                                <p className="text-sm ml-6">{validations[req.id]?.notes}</p>
-                            </div>
-                        )}
-                        <FileUpload
-                          {...req}
-                          uploadedFile={files[req.id] || null}
-                          onUpload={handleUpload}
-                          onRemove={handleRemove}
-                          isUploading={uploadingStatus[req.id]}
-                        />
-                    </div>
+                    <FileUpload
+                      key={req.id}
+                      {...req}
+                      uploadedFile={files[req.id] || null}
+                      onUpload={handleUpload}
+                      onRemove={handleRemove}
+                      isUploading={uploadingStatus[req.id]}
+                      validation={validations[req.id]}
+                    />
                   );
               })}
             </div>
