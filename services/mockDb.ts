@@ -123,7 +123,8 @@ class MockDatabase {
           } else if (data) {
               // Always return Supabase data if connected, even if empty, 
               // so it doesn't confusingly fall back to local storage.
-              return data as unknown as Submission[]; 
+              this.submissions = data as unknown as Submission[];
+              return this.submissions; 
           }
       }
       
@@ -200,8 +201,12 @@ class MockDatabase {
 
   // 3. VALIDATION
   async validateFile(submissionId: string, fileId: string, isValid: boolean, notes: string = ''): Promise<void> {
+    // Pastikan data terbaru dari Supabase sudah ada di local cache
+    await this.getSubmissions();
+    
     const sub = this.submissions.find(s => s.id === submissionId);
     if (sub) {
+      if (!sub.validations) sub.validations = {};
       sub.validations[fileId] = { isValid, notes };
       
       const isRevisionContext = sub.status.includes('revision');
@@ -220,14 +225,20 @@ class MockDatabase {
       this.saveToStorage();
 
       if (supabase) {
-          await supabase.from('submissions').update({ validations: sub.validations, status: sub.status }).eq('id', submissionId);
+          const { error } = await supabase.from('submissions').update({ validations: sub.validations, status: sub.status }).eq('id', submissionId);
+          if (error) {
+              console.error("Supabase Error:", error);
+              alert("Gagal memvalidasi di Supabase: " + error.message);
+          }
       }
     }
   }
 
   async resetFileValidation(submissionId: string, fileId: string): Promise<void> {
+    await this.getSubmissions();
     const sub = this.submissions.find(s => s.id === submissionId);
     if (sub) {
+      if (!sub.validations) sub.validations = {};
       delete sub.validations[fileId];
       if (!sub.status.includes('revision') && !sub.status.includes('completed')) {
           sub.status = 'pending'; 
@@ -235,7 +246,11 @@ class MockDatabase {
       this.saveToStorage();
 
       if (supabase) {
-          await supabase.from('submissions').update({ validations: sub.validations, status: sub.status }).eq('id', submissionId);
+          const { error } = await supabase.from('submissions').update({ validations: sub.validations, status: sub.status }).eq('id', submissionId);
+          if (error) {
+              console.error("Supabase Error:", error);
+              alert("Gagal mereset validasi di Supabase: " + error.message);
+          }
       }
     }
   }
@@ -260,7 +275,8 @@ class MockDatabase {
           if (error) {
               console.error("Supabase fetch schedules error:", error);
           } else if (data) {
-              return data as Schedule[];
+              this.schedules = data as Schedule[];
+              return this.schedules;
           }
       }
       return new Promise(resolve => setTimeout(() => resolve([...this.schedules]), 300));
