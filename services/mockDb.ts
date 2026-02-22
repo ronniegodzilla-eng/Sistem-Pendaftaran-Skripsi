@@ -1,3 +1,4 @@
+
 import { Submission, Schedule, FileRequirement } from '../types';
 import { PROPOSAL_REQUIREMENTS, SKRIPSI_REQUIREMENTS, PROPOSAL_REVISION_REQUIREMENTS, SKRIPSI_REVISION_REQUIREMENTS } from '../constants';
 import { supabase } from './supabase';
@@ -151,7 +152,7 @@ class MockDatabase {
       // Update Supabase
       if (supabase) {
           // Sanitize files to remove non-serializable JS File objects before sending to Supabase
-          const cleanSubmission = { ...submission };
+          const cleanSubmission = { ...submission } as any;
           const cleanFiles: any = {};
           if (cleanSubmission.files) {
               Object.keys(cleanSubmission.files).forEach(key => {
@@ -162,6 +163,9 @@ class MockDatabase {
               });
           }
           cleanSubmission.files = cleanFiles;
+
+          // Hapus properti yang tidak ada di tabel Supabase agar tidak memicu error "Could not find column"
+          delete cleanSubmission.academicYear;
 
           const { error } = await supabase.from('submissions').upsert(cleanSubmission);
           if (error) {
