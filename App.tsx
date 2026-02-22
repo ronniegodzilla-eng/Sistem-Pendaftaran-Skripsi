@@ -13,7 +13,7 @@ import { AdminReports } from './pages/AdminReports';
 import { LibraryAdmin } from './pages/LibraryAdmin';
 import { Assistant } from './components/Assistant';
 import { PageView } from './types';
-import { db } from './services/mockDb';
+import { supabase } from './services/supabase';
 
 const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<PageView>('dashboard');
