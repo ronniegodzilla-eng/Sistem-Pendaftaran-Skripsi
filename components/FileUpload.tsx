@@ -95,10 +95,10 @@ export const FileUpload: React.FC<FileUploadProps> = ({
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-slate-900 truncate">
-                {uploadedFile?.file.name || "Uploading..."}
+                {uploadedFile?.file?.name || (uploadedFile as any)?.name || "Berkas Tersimpan"}
               </p>
               <p className="text-xs text-slate-500">
-                {uploadedFile?.file ? (uploadedFile.file.size / 1024 / 1024).toFixed(2) + ' MB' : 'Processing...'}
+                {uploadedFile?.file ? (uploadedFile.file.size / 1024 / 1024).toFixed(2) + ' MB' : 'Tersimpan di sistem'}
               </p>
             </div>
           </div>
