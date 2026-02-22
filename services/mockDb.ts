@@ -157,9 +157,11 @@ class MockDatabase {
           const cleanFiles: any = {};
           if (cleanSubmission.files) {
               Object.keys(cleanSubmission.files).forEach(key => {
+                  const fileData = cleanSubmission.files[key];
                   cleanFiles[key] = {
-                      driveId: cleanSubmission.files[key].driveId,
-                      driveUrl: cleanSubmission.files[key].driveUrl
+                      driveId: fileData?.driveId,
+                      driveUrl: fileData?.driveUrl,
+                      name: fileData?.file?.name || fileData?.name || 'Berkas Tersimpan'
                   };
               });
           }
@@ -184,9 +186,11 @@ class MockDatabase {
              const cleanFiles: any = {};
              if (sub.files) {
                  Object.keys(sub.files).forEach(key => {
+                     const fileData = sub.files[key];
                      cleanFiles[key] = {
-                         driveId: sub.files[key].driveId,
-                         driveUrl: sub.files[key].driveUrl
+                         driveId: fileData?.driveId,
+                         driveUrl: fileData?.driveUrl,
+                         name: fileData?.file?.name || fileData?.name || 'Berkas Tersimpan'
                      };
                  });
              }
