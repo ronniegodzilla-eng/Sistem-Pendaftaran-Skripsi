@@ -8,6 +8,13 @@ interface DriveConfig {
 
 // Helper to get config
 export const getDriveConfig = (): DriveConfig => {
+    // 1. Prioritaskan ambil dari Environment Variable (Vercel)
+    const envUrl = import.meta.env.VITE_DRIVE_SCRIPT_URL;
+    if (envUrl) {
+        return { scriptUrl: envUrl };
+    }
+    
+    // 2. Fallback ke LocalStorage jika env tidak ada
     const stored = localStorage.getItem(DRIVE_CONFIG_KEY);
     return stored ? JSON.parse(stored) : { scriptUrl: '' };
 };
