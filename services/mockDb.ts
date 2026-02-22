@@ -1,5 +1,5 @@
 
-import { Submission, Schedule, FileRequirement } from './services/types.ts';
+import { Submission, Schedule, FileRequirement } from './types.ts';
 import { PROPOSAL_REQUIREMENTS, SKRIPSI_REQUIREMENTS, PROPOSAL_REVISION_REQUIREMENTS, SKRIPSI_REVISION_REQUIREMENTS } from './services/constants.ts';
 import { supabase } from './services/supabase.ts';
 
