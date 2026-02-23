@@ -21,12 +21,6 @@ const App: React.FC = () => {
   const [hasNotifications, setHasNotifications] = useState(false);
   const [dataVersion, setDataVersion] = useState(0); 
 
-  const proposalReqs = db.getRequirements('proposal');
-  const skripsiReqs = db.getRequirements('skripsi');
-
-  const proposalRevisionReqs = db.getRevisionRequirements('proposal');
-  const skripsiRevisionReqs = db.getRevisionRequirements('skripsi');
-
   useEffect(() => {
      const checkNotifications = async () => {
          const schedules = await db.getUpcomingSchedules();
@@ -90,7 +84,6 @@ const App: React.FC = () => {
             pageId="proposal"
             title="Pendaftaran Seminar Proposal"
             description="Lengkapi formulir di bawah ini untuk mendaftar Seminar Proposal."
-            requirements={proposalReqs}
             onBack={() => setCurrentPage('registration-hub')}
           />
         );
@@ -100,7 +93,6 @@ const App: React.FC = () => {
             pageId="skripsi"
             title="Pendaftaran Sidang Skripsi"
             description="Pastikan seluruh persyaratan telah terpenuhi sebelum mengajukan Sidang Skripsi."
-            requirements={skripsiReqs}
             onBack={() => setCurrentPage('registration-hub')}
           />
         );
@@ -109,7 +101,6 @@ const App: React.FC = () => {
           <RevisionPage
              type="proposal"
              title="Pengumpulan Revisi Seminar Proposal"
-             requirements={proposalRevisionReqs}
              onBack={() => setCurrentPage('registration-hub')}
           />
         );
@@ -118,7 +109,6 @@ const App: React.FC = () => {
             <RevisionPage
                 type="skripsi"
                 title="Pengumpulan Revisi Sidang Skripsi"
-                requirements={skripsiRevisionReqs}
                 onBack={() => setCurrentPage('registration-hub')}
             />
         );
