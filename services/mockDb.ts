@@ -173,7 +173,7 @@ class MockDatabase {
   // 2. ADD / UPDATE SUBMISSION
   async addSubmission(submission: Submission): Promise<void> {
       // Update Local
-      const existingIndex = this.submissions.findIndex(s => s.studentNpm === submission.studentNpm && s.type === submission.type);
+      const existingIndex = this.submissions.findIndex(s => s.id === submission.id);
       if (existingIndex >= 0) {
         this.submissions[existingIndex] = submission;
       } else {
