@@ -17,6 +17,7 @@ class MockDatabase {
   private activeYear: string = "2024/2025";
   private STORAGE_KEY_SUBMISSIONS = 'app_submissions';
   private STORAGE_KEY_SCHEDULES = 'app_schedules';
+  private STORAGE_KEY_ROOMS = 'app_rooms';
 
   constructor() {
       this.loadFromStorage();
@@ -27,8 +28,10 @@ class MockDatabase {
       if (typeof window !== 'undefined') {
           const storedSubs = localStorage.getItem(this.STORAGE_KEY_SUBMISSIONS);
           const storedScheds = localStorage.getItem(this.STORAGE_KEY_SCHEDULES);
+          const storedRooms = localStorage.getItem(this.STORAGE_KEY_ROOMS);
           if (storedSubs) this.submissions = JSON.parse(storedSubs);
           if (storedScheds) this.schedules = JSON.parse(storedScheds);
+          if (storedRooms) this.rooms = JSON.parse(storedRooms);
       }
   }
 
@@ -36,6 +39,7 @@ class MockDatabase {
       if (typeof window !== 'undefined') {
           localStorage.setItem(this.STORAGE_KEY_SUBMISSIONS, JSON.stringify(this.submissions));
           localStorage.setItem(this.STORAGE_KEY_SCHEDULES, JSON.stringify(this.schedules));
+          localStorage.setItem(this.STORAGE_KEY_ROOMS, JSON.stringify(this.rooms));
       }
   }
 
@@ -99,16 +103,43 @@ class MockDatabase {
       else this.skripsiRevisionRequirements = newReqs;
   }
 
-  getRooms() {
-      return this.rooms;
+  async getRooms(): Promise<string[]> {
+      if (supabase) {
+          const { data, error } = await supabase.from('rooms').select('name');
+          if (!error && data) {
+              this.rooms = data.map(d => d.name);
+              return this.rooms;
+          }
+      }
+      return new Promise(resolve => setTimeout(() => resolve([...this.rooms]), 300));
   }
   
-  addRoom(roomName: string) {
-      if (!this.rooms.includes(roomName)) this.rooms.push(roomName);
+  async addRoom(roomName: string): Promise<void> {
+      if (!this.rooms.includes(roomName)) {
+          this.rooms.push(roomName);
+          this.saveToStorage();
+          
+          if (supabase) {
+              const { error } = await supabase.from('rooms').insert({ name: roomName });
+              if (error) {
+                  console.error("Supabase Insert Room Error:", error);
+                  alert("Gagal menyimpan ruangan ke Supabase: " + error.message);
+              }
+          }
+      }
   }
 
-  deleteRoom(roomName: string) {
+  async deleteRoom(roomName: string): Promise<void> {
       this.rooms = this.rooms.filter(r => r !== roomName);
+      this.saveToStorage();
+      
+      if (supabase) {
+          const { error } = await supabase.from('rooms').delete().eq('name', roomName);
+          if (error) {
+              console.error("Supabase Delete Room Error:", error);
+              alert("Gagal menghapus ruangan di Supabase: " + error.message);
+          }
+      }
   }
 
   // --- ASYNC DATA OPERATIONS ---
@@ -307,7 +338,10 @@ class MockDatabase {
       this.saveToStorage();
 
       if (supabase) {
-          const { error: schedError } = await supabase.from('schedules').insert(schedule);
+          const cleanSchedule = { ...schedule } as any;
+          delete cleanSchedule.academicYear;
+
+          const { error: schedError } = await supabase.from('schedules').insert(cleanSchedule);
           if (schedError) {
               console.error("Supabase Insert Schedule Error:", schedError);
               alert("Gagal menyimpan jadwal ke Supabase: " + schedError.message);
