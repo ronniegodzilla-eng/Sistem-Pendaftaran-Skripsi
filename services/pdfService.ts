@@ -172,3 +172,84 @@ export const generateFullReport = async () => {
 
     doc.save(`Laporan_Lengkap_Sistem_${Date.now()}.pdf`);
 };
+
+export const generateStudentSubmissionReport = async (npm: string, type: 'proposal' | 'revision_proposal' | 'skripsi' | 'revision_skripsi' | 'all') => {
+    const doc = new jsPDF();
+    const students = await getAllStudents();
+    const student = students.find(s => s.npm === npm);
+    
+    if (!student) {
+        alert("Mahasiswa tidak ditemukan.");
+        return;
+    }
+
+    const submissions = await db.getSubmissions();
+    const studentSubs = submissions.filter(s => s.studentNpm === npm);
+
+    doc.setFontSize(18);
+    doc.text(`Rekapitulasi Berkas Pendaftaran`, 14, 22);
+    doc.setFontSize(12);
+    doc.text(`Nama: ${student.nama}`, 14, 32);
+    doc.text(`NPM: ${student.npm}`, 14, 38);
+    doc.text(`Program Studi: ${student.prodi}`, 14, 44);
+    doc.setFontSize(10);
+    doc.text(`Dicetak pada: ${new Date().toLocaleString('id-ID')}`, 14, 52);
+
+    let startY = 60;
+
+    const renderSubmission = async (subType: 'proposal' | 'skripsi', isRevision: boolean, title: string) => {
+        const sub = studentSubs.find(s => s.type === subType);
+        if (!sub) return;
+
+        // Skip if we only want revision but status doesn't include it, or vice versa
+        // Actually, the files are all in the same submission object, just different keys based on requirements.
+        
+        let reqs = [];
+        if (isRevision) {
+            reqs = await db.getRevisionRequirements(subType);
+        } else {
+            reqs = await db.getRequirements(subType);
+        }
+
+        const tableData = reqs.map(req => {
+            const file = sub.files[req.id];
+            const status = sub.validations[req.id]?.isValid === true ? 'Valid' : (sub.validations[req.id]?.isValid === false ? 'Ditolak' : 'Menunggu');
+            const notes = sub.validations[req.id]?.notes || '-';
+            return [
+                req.label,
+                file ? 'Ada' : 'Tidak Ada',
+                status,
+                notes,
+                file?.driveUrl || '-'
+            ];
+        });
+
+        if (tableData.length > 0) {
+            doc.setFontSize(14);
+            doc.text(title, 14, startY);
+            autoTable(doc, {
+                head: [['Nama Berkas', 'Status Upload', 'Validasi', 'Catatan', 'Link File']],
+                body: tableData,
+                startY: startY + 5,
+                columnStyles: { 4: { cellWidth: 50, fontSize: 8 } },
+                styles: { overflow: 'linebreak' }
+            });
+            startY = (doc as any).lastAutoTable.finalY + 15;
+        }
+    };
+
+    if (type === 'proposal' || type === 'all') {
+        await renderSubmission('proposal', false, '1. Pendaftaran Seminar Proposal');
+    }
+    if (type === 'revision_proposal' || type === 'all') {
+        await renderSubmission('proposal', true, '2. Revisi Seminar Proposal');
+    }
+    if (type === 'skripsi' || type === 'all') {
+        await renderSubmission('skripsi', false, '3. Pendaftaran Sidang Skripsi');
+    }
+    if (type === 'revision_skripsi' || type === 'all') {
+        await renderSubmission('skripsi', true, '4. Revisi Sidang Skripsi');
+    }
+
+    doc.save(`Rekap_Berkas_${student.npm}_${type}.pdf`);
+};

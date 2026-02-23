@@ -381,6 +381,25 @@ class MockDatabase {
       }
   }
 
+  async updateSchedule(scheduleId: string, updates: Partial<Schedule>): Promise<void> {
+      const schedule = this.schedules.find(s => s.id === scheduleId);
+      if (!schedule) return;
+
+      Object.assign(schedule, updates);
+      this.saveToStorage();
+
+      if (supabase) {
+          const cleanUpdates = { ...updates } as any;
+          delete cleanUpdates.academicYear;
+
+          const { error } = await supabase.from('schedules').update(cleanUpdates).eq('id', scheduleId);
+          if (error) {
+              console.error("Supabase Update Schedule Error:", error);
+              alert("Gagal mengupdate jadwal ke Supabase: " + error.message);
+          }
+      }
+  }
+
   async completeSchedule(scheduleId: string): Promise<void> {
     const schedule = this.schedules.find(s => s.id === scheduleId);
     if (!schedule) return;
