@@ -52,9 +52,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onDataChange }) =>
 
   useEffect(() => {
     // Load Requirements
-    const reqs = db.getRequirements(reqType);
-    setRequirements(JSON.parse(JSON.stringify(reqs))); // Deep copy
-    setHasReqChanges(false);
+    db.getRequirements(reqType).then(reqs => {
+        setRequirements(JSON.parse(JSON.stringify(reqs))); // Deep copy
+        setHasReqChanges(false);
+    });
   }, [reqType]);
 
   useEffect(() => {
@@ -104,9 +105,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ onDataChange }) =>
       }
   };
 
-  const saveRequirements = () => {
-      db.updateRequirements(reqType, requirements);
+  const saveRequirements = async () => {
+      await db.updateRequirements(reqType, requirements);
       setHasReqChanges(false);
+      if(onDataChange) onDataChange();
       alert('Persyaratan berhasil disimpan!');
   };
 

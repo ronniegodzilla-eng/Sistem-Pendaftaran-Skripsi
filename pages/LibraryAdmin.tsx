@@ -44,9 +44,10 @@ export const LibraryAdmin: React.FC = () => {
 
   useEffect(() => {
     if (activeTab === 'settings') {
-        const reqs = db.getRevisionRequirements(reqType);
-        setRequirements(JSON.parse(JSON.stringify(reqs)));
-        setHasReqChanges(false);
+        db.getRevisionRequirements(reqType).then(reqs => {
+            setRequirements(JSON.parse(JSON.stringify(reqs)));
+            setHasReqChanges(false);
+        });
     }
   }, [activeTab, reqType]);
 
@@ -56,8 +57,22 @@ export const LibraryAdmin: React.FC = () => {
       setHardcopyChecked(isCompleted);
   };
 
+  const [revisionRequirements, setRevisionRequirements] = useState<Record<string, FileRequirement[]>>({});
+
+  useEffect(() => {
+    const loadReqs = async () => {
+        const propReqs = await db.getRevisionRequirements('proposal');
+        const skripReqs = await db.getRevisionRequirements('skripsi');
+        setRevisionRequirements({
+            proposal: propReqs,
+            skripsi: skripReqs
+        });
+    };
+    loadReqs();
+  }, []);
+
   const getRequirements = (type: 'proposal' | 'skripsi'): FileRequirement[] => {
-      return db.getRevisionRequirements(type);
+      return revisionRequirements[type] || [];
   };
 
   const handleValidateFile = async (subId: string, fileId: string, isValid: boolean) => {
@@ -134,9 +149,18 @@ export const LibraryAdmin: React.FC = () => {
       }
   };
 
-  const saveRequirements = () => {
-      db.updateRevisionRequirements(reqType, requirements);
+  const saveRequirements = async () => {
+      await db.updateRevisionRequirements(reqType, requirements);
       setHasReqChanges(false);
+      
+      // Update the local state for validation tab
+      const propReqs = await db.getRevisionRequirements('proposal');
+      const skripReqs = await db.getRevisionRequirements('skripsi');
+      setRevisionRequirements({
+          proposal: propReqs,
+          skripsi: skripReqs
+      });
+
       alert('Persyaratan Revisi berhasil disimpan!');
   };
 

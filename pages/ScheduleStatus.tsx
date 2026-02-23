@@ -13,6 +13,9 @@ export const ScheduleStatus: React.FC = () => {
   
   const [selectedReason, setSelectedReason] = useState<Submission | null>(null);
 
+  const [revisionRequirements, setRevisionRequirements] = useState<Record<string, FileRequirement[]>>({});
+  const [requirements, setRequirements] = useState<Record<string, FileRequirement[]>>({});
+
   useEffect(() => {
     const fetchData = async () => {
         setLoading(true);
@@ -20,6 +23,23 @@ export const ScheduleStatus: React.FC = () => {
         const loadedSubmissions = await db.getSubmissions();
         setSchedules(loadedSchedules);
         setSubmissions(loadedSubmissions);
+        
+        // Pre-fetch revision requirements for all submission types
+        const propReqs = await db.getRevisionRequirements('proposal');
+        const skripReqs = await db.getRevisionRequirements('skripsi');
+        setRevisionRequirements({
+            proposal: propReqs,
+            skripsi: skripReqs
+        });
+
+        // Pre-fetch normal requirements for all submission types
+        const propNormalReqs = await db.getRequirements('proposal');
+        const skripNormalReqs = await db.getRequirements('skripsi');
+        setRequirements({
+            proposal: propNormalReqs,
+            skripsi: skripNormalReqs
+        });
+        
         setLoading(false);
     };
     fetchData();
@@ -70,8 +90,8 @@ export const ScheduleStatus: React.FC = () => {
   const getRejectedFiles = (sub: Submission) => {
       const isRevisionContext = sub.status.includes('revision') || sub.status.includes('completed');
       const reqs = isRevisionContext 
-        ? db.getRevisionRequirements(sub.type)
-        : db.getRequirements(sub.type);
+        ? (revisionRequirements[sub.type] || [])
+        : (requirements[sub.type] || []);
 
       return reqs.filter(r => sub.validations[r.id]?.isValid === false);
   }

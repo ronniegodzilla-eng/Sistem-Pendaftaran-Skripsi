@@ -33,6 +33,8 @@ export const AdminValidation: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [requirements, setRequirements] = useState<Record<string, FileRequirement[]>>({});
+
   const refreshData = async () => {
       setLoading(true);
       const all = await db.getSubmissions();
@@ -42,6 +44,15 @@ export const AdminValidation: React.FC = () => {
           s.status === 'rejected' || 
           s.status === 'validated'
       ).sort((a,b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()));
+
+      // Pre-fetch normal requirements for all submission types
+      const propNormalReqs = await db.getRequirements('proposal');
+      const skripNormalReqs = await db.getRequirements('skripsi');
+      setRequirements({
+          proposal: propNormalReqs,
+          skripsi: skripNormalReqs
+      });
+
       setLoading(false);
   }
 
@@ -70,7 +81,7 @@ export const AdminValidation: React.FC = () => {
   };
 
   const getRequirements = (sub: Submission) => {
-      return db.getRequirements(sub.type);
+      return requirements[sub.type] || [];
   };
 
   const formatDateGMT7 = (dateString: string | Date) => {

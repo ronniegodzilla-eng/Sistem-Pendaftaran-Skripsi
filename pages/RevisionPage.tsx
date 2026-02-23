@@ -9,14 +9,12 @@ import { db } from '../services/mockDb';
 
 interface RevisionPageProps {
   title: string;
-  requirements: FileRequirement[];
   onBack: () => void;
   type: 'proposal' | 'skripsi';
 }
 
 export const RevisionPage: React.FC<RevisionPageProps> = ({ 
   title, 
-  requirements, 
   onBack,
   type
 }) => {
@@ -27,6 +25,15 @@ export const RevisionPage: React.FC<RevisionPageProps> = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const [student, setStudent] = useState<Student | null>(null);
+  const [requirements, setRequirements] = useState<FileRequirement[]>([]);
+
+  useEffect(() => {
+    const loadReqs = async () => {
+        const reqs = await db.getRevisionRequirements(type);
+        setRequirements(reqs);
+    };
+    loadReqs();
+  }, [type]);
   const [files, setFiles] = useState<SubmissionState>({});
   const [validations, setValidations] = useState<{[key: string]: ValidationItem}>({});
   const [uploadingStatus, setUploadingStatus] = useState<{[key: string]: boolean}>({});

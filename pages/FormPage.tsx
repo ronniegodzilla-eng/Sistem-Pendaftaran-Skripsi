@@ -11,7 +11,6 @@ import { db } from '../services/mockDb';
 interface FormPageProps {
   title: string;
   description: string;
-  requirements: FileRequirement[];
   onBack: () => void;
   pageId: PageView;
 }
@@ -19,7 +18,6 @@ interface FormPageProps {
 export const FormPage: React.FC<FormPageProps> = ({ 
   title, 
   description, 
-  requirements, 
   onBack,
   pageId
 }) => {
@@ -30,6 +28,16 @@ export const FormPage: React.FC<FormPageProps> = ({
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const [student, setStudent] = useState<Student | null>(null);
+  const [requirements, setRequirements] = useState<FileRequirement[]>([]);
+
+  useEffect(() => {
+    const loadReqs = async () => {
+        const type = pageId === 'proposal' ? 'proposal' : 'skripsi';
+        const reqs = await db.getRequirements(type);
+        setRequirements(reqs);
+    };
+    loadReqs();
+  }, [pageId]);
   const [files, setFiles] = useState<SubmissionState>({});
   const [validations, setValidations] = useState<{[key: string]: ValidationItem}>({});
   
