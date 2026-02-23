@@ -32,7 +32,7 @@ export const AdminScheduling: React.FC = () => {
     const schedules = await db.getSchedules();
     setReadySubmissions(allSubs.filter(s => s.status === 'validated'));
     setExistingSchedules(schedules);
-    setAvailableRooms(db.getRooms());
+    setAvailableRooms(await db.getRooms());
     setLoading(false);
   };
 
@@ -78,18 +78,18 @@ export const AdminScheduling: React.FC = () => {
       }
   };
 
-  const handleAddRoom = () => {
+  const handleAddRoom = async () => {
       if (newRoomName.trim()) {
-          db.addRoom(newRoomName.trim());
+          await db.addRoom(newRoomName.trim());
           setNewRoomName('');
-          setAvailableRooms(db.getRooms());
+          setAvailableRooms(await db.getRooms());
       }
   };
 
-  const handleDeleteRoom = (r: string) => {
+  const handleDeleteRoom = async (r: string) => {
       if (confirm(`Hapus ruangan ${r}?`)) {
-          db.deleteRoom(r);
-          setAvailableRooms(db.getRooms());
+          await db.deleteRoom(r);
+          setAvailableRooms(await db.getRooms());
           if (room === r) setRoom('');
       }
   };
