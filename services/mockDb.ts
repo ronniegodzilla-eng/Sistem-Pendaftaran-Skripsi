@@ -85,22 +85,52 @@ class MockDatabase {
   }
 
   // --- Requirements Management (Sync for UI speed) ---
-  getRequirements(type: 'proposal' | 'skripsi') {
+  async getRequirements(type: 'proposal' | 'skripsi'): Promise<FileRequirement[]> {
+      if (supabase) {
+          const { data, error } = await supabase.from('settings').select('value').eq('key', `req_${type}`).single();
+          if (!error && data && data.value) {
+              if (type === 'proposal') this.proposalRequirements = data.value;
+              else this.skripsiRequirements = data.value;
+          }
+      }
       return type === 'proposal' ? this.proposalRequirements : this.skripsiRequirements;
   }
 
-  updateRequirements(type: 'proposal' | 'skripsi', newReqs: FileRequirement[]) {
+  async updateRequirements(type: 'proposal' | 'skripsi', newReqs: FileRequirement[]): Promise<void> {
       if (type === 'proposal') this.proposalRequirements = newReqs;
       else this.skripsiRequirements = newReqs;
+      
+      if (supabase) {
+          const { error } = await supabase.from('settings').upsert({ key: `req_${type}`, value: newReqs });
+          if (error) {
+              console.error("Supabase Update Req Error:", error);
+              alert("Gagal menyimpan pengaturan syarat ke Supabase: " + error.message);
+          }
+      }
   }
 
-  getRevisionRequirements(type: 'proposal' | 'skripsi') {
+  async getRevisionRequirements(type: 'proposal' | 'skripsi'): Promise<FileRequirement[]> {
+      if (supabase) {
+          const { data, error } = await supabase.from('settings').select('value').eq('key', `revision_req_${type}`).single();
+          if (!error && data && data.value) {
+              if (type === 'proposal') this.proposalRevisionRequirements = data.value;
+              else this.skripsiRevisionRequirements = data.value;
+          }
+      }
       return type === 'proposal' ? this.proposalRevisionRequirements : this.skripsiRevisionRequirements;
   }
 
-  updateRevisionRequirements(type: 'proposal' | 'skripsi', newReqs: FileRequirement[]) {
+  async updateRevisionRequirements(type: 'proposal' | 'skripsi', newReqs: FileRequirement[]): Promise<void> {
       if (type === 'proposal') this.proposalRevisionRequirements = newReqs;
       else this.skripsiRevisionRequirements = newReqs;
+      
+      if (supabase) {
+          const { error } = await supabase.from('settings').upsert({ key: `revision_req_${type}`, value: newReqs });
+          if (error) {
+              console.error("Supabase Update Revision Req Error:", error);
+              alert("Gagal menyimpan pengaturan syarat revisi ke Supabase: " + error.message);
+          }
+      }
   }
 
   async getRooms(): Promise<string[]> {
