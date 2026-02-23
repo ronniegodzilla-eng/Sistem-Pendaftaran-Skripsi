@@ -129,7 +129,7 @@ export const ScheduleStatus: React.FC = () => {
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Jenis</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Jadwal</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Ruang</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Dosen</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Pembimbing & Penguji</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th>
                             </tr>
                         </thead>
@@ -145,7 +145,14 @@ export const ScheduleStatus: React.FC = () => {
                                         <td className="px-6 py-4"><span className="text-xs font-bold uppercase">{item.type}</span></td>
                                         <td className="px-6 py-4 text-sm">{item.date} <br/><span className="text-slate-500">{item.time}-{item.endTime}</span></td>
                                         <td className="px-6 py-4 text-sm">{item.room}</td>
-                                        <td className="px-6 py-4 text-xs text-slate-600">P1: {item.pembimbing1}<br/>P2: {item.pembimbing2}</td>
+                                        <td className="px-6 py-4 text-xs text-slate-600">
+                                            <div className="flex flex-col gap-1">
+                                                <div><span className="font-semibold">P1:</span> {item.pembimbing1}</div>
+                                                <div><span className="font-semibold">P2:</span> {item.pembimbing2}</div>
+                                                {item.penguji1 && <div><span className="font-semibold">U1:</span> {item.penguji1}</div>}
+                                                {item.penguji2 && <div><span className="font-semibold">U2:</span> {item.penguji2}</div>}
+                                            </div>
+                                        </td>
                                         <td className="px-6 py-4">
                                             {item.status === 'completed' ? <span className="text-xs bg-slate-200 px-2 py-1 rounded font-bold">Selesai</span> : <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold">Upcoming</span>}
                                         </td>
