@@ -26,6 +26,8 @@ export const AdminScheduling: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
 
+  const [isEditing, setIsEditing] = useState(false);
+
   const refreshData = async () => {
     setLoading(true);
     const allSubs = await db.getSubmissions();
@@ -62,10 +64,17 @@ export const AdminScheduling: React.FC = () => {
                const sub = subs.find(s => s.id === selectedSchedule.submissionId);
                if(sub) getStudentByNPM(sub.studentNpm).then(setStudentDetails);
           });
+          
+          if (isEditing) {
+              setDate(selectedSchedule.date);
+              setTime(selectedSchedule.time);
+              setEndTime(selectedSchedule.endTime);
+              setRoom(selectedSchedule.room);
+          }
       } else {
           setStudentDetails(null);
       }
-  }, [selectedSubmission, selectedSchedule]);
+  }, [selectedSubmission, selectedSchedule, isEditing]);
 
   const handleStartTimeChange = (val: string) => {
       setTime(val);
@@ -136,6 +145,39 @@ export const AdminScheduling: React.FC = () => {
       setProcessing(false);
   };
 
+  const handleUpdateSchedule = async () => {
+      if (!selectedSchedule || !date || !time || !endTime || !room) return;
+      setProcessing(true);
+
+      const updatedSchedule: Schedule = {
+          ...selectedSchedule,
+          date,
+          time,
+          endTime,
+          room
+      };
+
+      const error = await db.checkConflict(updatedSchedule);
+      if (error) {
+          setConflictError(error);
+          setProcessing(false);
+          return;
+      }
+
+      await db.updateSchedule(selectedSchedule.id, { date, time, endTime, room });
+      alert('Jadwal berhasil diupdate!');
+      
+      setIsEditing(false);
+      setSelectedSchedule(null);
+      await refreshData();
+      setDate('');
+      setTime('');
+      setEndTime('');
+      setRoom('');
+      setConflictError(null);
+      setProcessing(false);
+  };
+
   const handleResetSchedule = async () => {
       if (!selectedSchedule) return;
       const reason = window.prompt("Masukkan alasan reset jadwal:", "Tidak Lulus / Ujian Ulang");
@@ -178,7 +220,7 @@ export const AdminScheduling: React.FC = () => {
                     <CheckSquare size={14} /> Antrian
                 </button>
                 <button 
-                    onClick={() => { setActiveTab('scheduled'); setSelectedSubmission(null); }}
+                    onClick={() => { setActiveTab('scheduled'); setSelectedSubmission(null); setIsEditing(false); }}
                     className={`flex-1 py-3 text-sm font-semibold flex items-center justify-center gap-1 ${activeTab === 'scheduled' ? 'bg-white text-indigo-600 border-b-2 border-indigo-600' : 'bg-slate-50 text-slate-500'}`}
                 >
                     <List size={14} /> Terjadwal
@@ -202,7 +244,7 @@ export const AdminScheduling: React.FC = () => {
                 {activeTab === 'scheduled' && (
                     existingSchedules.length === 0 ? <div className="p-8 text-center text-slate-500 text-sm">Belum ada jadwal.</div> :
                     existingSchedules.map(sch => (
-                        <div key={sch.id} onClick={() => { setSelectedSchedule(sch); }}
+                        <div key={sch.id} onClick={() => { setSelectedSchedule(sch); setIsEditing(false); }}
                             className={`p-4 cursor-pointer transition-colors border-l-4 
                             ${sch.status === 'completed' 
                                 ? 'bg-slate-50 border-slate-300 opacity-70 hover:bg-slate-100' 
@@ -305,21 +347,69 @@ export const AdminScheduling: React.FC = () => {
                             <h2 className="text-lg font-bold text-slate-900">Detail Jadwal {selectedSchedule.status === 'completed' ? '(Selesai)' : '(Aktif)'}</h2>
                             <p className="text-lg font-medium">{selectedSchedule.studentName}</p>
                         </div>
-                        {selectedSchedule.status === 'completed' && <span className="bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Selesai</span>}
+                        <div className="flex items-center gap-2">
+                            {selectedSchedule.status === 'upcoming' && !isEditing && (
+                                <button onClick={() => setIsEditing(true)} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold hover:bg-indigo-200 transition-colors">Edit Jadwal</button>
+                            )}
+                            {selectedSchedule.status === 'completed' && <span className="bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Selesai</span>}
+                        </div>
                      </div>
 
-                     <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-                         <div>
-                             <span className="block text-slate-500">Waktu</span>
-                             <span className="font-medium">{selectedSchedule.date}, {selectedSchedule.time} - {selectedSchedule.endTime}</span>
+                     {isEditing ? (
+                         <div className="space-y-4 mb-6">
+                             <div className="grid grid-cols-2 gap-4">
+                                 <div>
+                                     <label className="block text-sm mb-1 font-medium">Tanggal</label>
+                                     <input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500"/>
+                                 </div>
+                                 <div className="flex gap-2">
+                                     <div className="flex-1">
+                                         <label className="block text-sm mb-1 font-medium">Jam Mulai</label>
+                                         <input type="time" value={time} onChange={e => handleStartTimeChange(e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500"/>
+                                     </div>
+                                     <div className="flex-1">
+                                         <label className="block text-sm mb-1 font-medium">Jam Selesai</label>
+                                         <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500"/>
+                                     </div>
+                                 </div>
+                             </div>
+                             
+                             <div>
+                                 <label className="block text-sm font-medium mb-1">Ruangan</label>
+                                 <select value={room} onChange={e=>setRoom(e.target.value)} className="w-full border p-2 rounded focus:ring-2 focus:ring-indigo-500">
+                                     <option value="">-- Pilih Ruangan --</option>
+                                     {availableRooms.map(r => <option key={r} value={r}>{r}</option>)}
+                                 </select>
+                             </div>
+
+                             {conflictError && (
+                                 <div className="text-red-700 bg-red-50 border border-red-200 p-3 rounded flex items-start gap-2 animate-pulse">
+                                     <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
+                                     <span className="text-sm font-medium">{conflictError}</span>
+                                 </div>
+                             )}
+
+                             <div className="flex justify-end gap-2 pt-2">
+                                 <button type="button" onClick={() => { setIsEditing(false); setConflictError(null); }} className="px-4 py-2 rounded text-slate-600 hover:bg-slate-100 transition-colors">Batal</button>
+                                 <button type="button" onClick={handleUpdateSchedule} disabled={!date||!time||!endTime||!room || processing} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded shadow transition-all disabled:opacity-50">
+                                     {processing ? <Loader2 className="animate-spin" size={18}/> : 'Simpan Perubahan'}
+                                 </button>
+                             </div>
                          </div>
-                         <div>
-                             <span className="block text-slate-500">Ruangan</span>
-                             <span className="font-medium">{selectedSchedule.room}</span>
+                     ) : (
+                         <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+                             <div>
+                                 <span className="block text-slate-500">Waktu</span>
+                                 <span className="font-medium">{selectedSchedule.date}, {selectedSchedule.time} - {selectedSchedule.endTime}</span>
+                             </div>
+                             <div>
+                                 <span className="block text-slate-500">Ruangan</span>
+                                 <span className="font-medium">{selectedSchedule.room}</span>
+                             </div>
                          </div>
-                     </div>
+                     )}
                      
-                     {selectedSchedule.status === 'upcoming' ? (
+                     {selectedSchedule.status === 'upcoming' && !isEditing ? (
                          <>
                             <div className="bg-purple-50 p-4 rounded-xl border border-purple-100 mb-4">
                                 <h3 className="text-purple-800 font-bold mb-2">Selesai Sidang</h3>

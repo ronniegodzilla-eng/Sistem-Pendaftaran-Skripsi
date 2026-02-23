@@ -1,9 +1,59 @@
 
-import React from 'react';
-import { FileText, Users, Calendar, Archive, Download } from 'lucide-react';
-import { generateStudentReport, generateSubmissionReport, generateScheduleReport, generateFullReport } from '../services/pdfService';
+import React, { useState, useEffect, useRef } from 'react';
+import { FileText, Users, Calendar, Archive, Download, Search, Loader2, X } from 'lucide-react';
+import { generateStudentReport, generateSubmissionReport, generateScheduleReport, generateFullReport, generateStudentSubmissionReport } from '../services/pdfService';
+import { searchStudentsByName } from '../services/studentService';
+import { Student } from '../types';
 
 export const AdminReports: React.FC = () => {
+  const [searchInput, setSearchInput] = useState('');
+  const [suggestions, setSuggestions] = useState<Student[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [student, setStudent] = useState<Student | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setSuggestions([]);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchInput(value);
+    if (student) {
+        setStudent(null);
+    }
+    if (value.length >= 3) {
+      setIsSearching(true);
+      try {
+        const results = await searchStudentsByName(value);
+        setSuggestions(results);
+      } catch (err) {
+        console.error("Search error", err);
+      } finally {
+        setIsSearching(false);
+      }
+    } else {
+      setSuggestions([]);
+    }
+  };
+
+  const handleSelectStudent = (selected: Student) => {
+      setStudent(selected);
+      setSearchInput(selected.nama);
+      setSuggestions([]);
+  };
+
+  const clearSelection = () => {
+      setStudent(null);
+      setSearchInput('');
+      setSuggestions([]);
+  };
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="mb-8">
@@ -13,6 +63,75 @@ export const AdminReports: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
+          {/* Card: Laporan per Mahasiswa */}
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 md:col-span-2">
+              <div className="flex items-center gap-4 mb-4">
+                  <div className="bg-purple-100 p-3 rounded-full text-purple-600">
+                      <FileText size={24} />
+                  </div>
+                  <div>
+                      <h3 className="font-bold text-lg text-slate-900">Rekapitulasi Berkas per Mahasiswa</h3>
+                      <p className="text-sm text-slate-500">Unduh rekap berkas pendaftaran dan revisi untuk satu mahasiswa tertentu.</p>
+                  </div>
+              </div>
+              
+              <div className="max-w-xl mb-4" ref={searchContainerRef}>
+                  <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          {isSearching ? <Loader2 className="animate-spin text-slate-400" size={18}/> : <Search className="text-slate-400" size={18}/>}
+                      </div>
+                      <input 
+                          type="text" 
+                          value={searchInput}
+                          onChange={handleSearchChange}
+                          disabled={!!student}
+                          placeholder="Cari nama mahasiswa..."
+                          className={`w-full pl-10 pr-10 py-2.5 border rounded-lg focus:ring-2 focus:ring-indigo-500 transition-shadow ${student ? 'bg-slate-50 border-slate-200 text-slate-500' : 'border-slate-300'}`}
+                      />
+                      {student && (
+                          <button onClick={clearSelection} className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+                              <X size={18} />
+                          </button>
+                      )}
+                      
+                      {!student && suggestions.length > 0 && (
+                          <div className="absolute z-50 w-full bg-white mt-1 border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {suggestions.map((s) => (
+                                  <button
+                                      key={s.npm}
+                                      onClick={() => handleSelectStudent(s)}
+                                      className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0 transition-colors"
+                                  >
+                                      <p className="font-medium text-slate-900 text-sm">{s.nama}</p>
+                                      <p className="text-xs text-slate-500">{s.npm} • {s.prodi}</p>
+                                  </button>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              </div>
+
+              {student && (
+                  <div className="flex flex-wrap gap-2 animate-fade-in">
+                      <button onClick={() => generateStudentSubmissionReport(student.npm, 'proposal')} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium">
+                          <Download size={16} /> Proposal
+                      </button>
+                      <button onClick={() => generateStudentSubmissionReport(student.npm, 'revision_proposal')} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium">
+                          <Download size={16} /> Revisi Proposal
+                      </button>
+                      <button onClick={() => generateStudentSubmissionReport(student.npm, 'skripsi')} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium">
+                          <Download size={16} /> Skripsi
+                      </button>
+                      <button onClick={() => generateStudentSubmissionReport(student.npm, 'revision_skripsi')} className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium">
+                          <Download size={16} /> Revisi Skripsi
+                      </button>
+                      <button onClick={() => generateStudentSubmissionReport(student.npm, 'all')} className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors text-sm font-medium">
+                          <Download size={16} /> Keseluruhan
+                      </button>
+                  </div>
+              )}
+          </div>
+
           {/* Card 1: Data Mahasiswa */}
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
               <div className="flex items-center gap-4 mb-4">
