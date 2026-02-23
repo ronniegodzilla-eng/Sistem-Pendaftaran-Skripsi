@@ -160,8 +160,10 @@ export const FormPage: React.FC<FormPageProps> = ({
 
     setIsSubmitting(true);
     
+    const existing = await db.getSubmissionByNpm(student.npm, pageId === 'proposal' ? 'proposal' : 'skripsi');
+    
     const newSubmission = {
-      id: Date.now().toString(),
+      id: existing ? existing.id : Date.now().toString(),
       studentNpm: student.npm,
       studentName: student.nama,
       type: pageId === 'proposal' ? 'proposal' : 'skripsi' as 'proposal' | 'skripsi',
