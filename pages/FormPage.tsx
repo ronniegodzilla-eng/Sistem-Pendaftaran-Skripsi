@@ -86,11 +86,13 @@ export const FormPage: React.FC<FormPageProps> = ({
       setSearchError('');
 
       if (pageId === 'skripsi') {
-          const proposal = await db.getSubmissionByNpm(selected.npm, 'proposal');
-          if (!proposal || proposal.status !== 'proposal_completed') {
-               setSearchError('Anda harus menyelesaikan Seminar Proposal dan Revisi Proposal (Status: Sempro Selesai) sebelum mendaftar Skripsi.');
-               setStudent(null);
-               return;
+          if (!selected.bypassProposal) {
+              const proposal = await db.getSubmissionByNpm(selected.npm, 'proposal');
+              if (!proposal || proposal.status !== 'proposal_completed') {
+                   setSearchError('Anda harus menyelesaikan Seminar Proposal dan Revisi Proposal (Status: Sempro Selesai) sebelum mendaftar Skripsi.');
+                   setStudent(null);
+                   return;
+              }
           }
       }
       

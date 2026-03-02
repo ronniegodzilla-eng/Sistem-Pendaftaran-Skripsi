@@ -694,6 +694,18 @@ function doPost(e) {
                                     onChange={e => setStudentModalData({...studentModalData, judul_skripsi: e.target.value})} 
                                   />
                               </div>
+                              <div className="flex items-center gap-2 mt-2 mb-2">
+                                  <input 
+                                      type="checkbox" 
+                                      id="bypassProposal" 
+                                      checked={!!studentModalData.bypassProposal}
+                                      onChange={e => setStudentModalData({...studentModalData, bypassProposal: e.target.checked})}
+                                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                  />
+                                  <label htmlFor="bypassProposal" className="text-sm text-slate-700 font-medium cursor-pointer">
+                                      Bypass Seminar Proposal (Langsung Skripsi)
+                                  </label>
+                              </div>
                               <div className="grid grid-cols-2 gap-2">
                                   <input className="w-full border p-2 rounded text-xs" placeholder="Pembimbing 1" value={studentModalData.pembimbing_1} onChange={e => setStudentModalData({...studentModalData, pembimbing_1: e.target.value})} />
                                   <input className="w-full border p-2 rounded text-xs" placeholder="Pembimbing 2" value={studentModalData.pembimbing_2} onChange={e => setStudentModalData({...studentModalData, pembimbing_2: e.target.value})} />
