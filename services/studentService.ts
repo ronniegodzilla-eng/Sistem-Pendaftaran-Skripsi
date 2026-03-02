@@ -4,7 +4,7 @@ import { Student } from '../types';
 import * as XLSX from 'xlsx';
 
 // Update version key to ensure fresh logic applies
-const STORAGE_KEY_STUDENTS = 'app_students_master_v5';
+const STORAGE_KEY_STUDENTS = 'app_students_master_v7';
 
 const RAW_CSV_DATA = `Nama,NPM,Prodi,Judul Skripsi,Pembimbing 1,Pembimbing 2,Penguji 1,Penguji 2
 Naily Nur Suliana,K3-2025-001,K3,-,Dosen P1,Dosen P2,Dosen U1,Dosen U2
@@ -279,7 +279,7 @@ export const updateStudent = async (npm: string, data: Student): Promise<void> =
     const all = await getAllStudents();
     const index = all.findIndex(s => s.npm === npm);
     if (index >= 0) {
-        all[index] = data;
+        all[index] = { ...all[index], ...data };
         saveStudentsToStorage(all);
 
         if (supabase) {
@@ -316,13 +316,11 @@ export const parseExcel = (buffer: ArrayBuffer): Student[] => {
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     
-    // Use json to get raw data, we will map it manually to ensure key safety
     const jsonData = XLSX.utils.sheet_to_json(worksheet) as any[];
 
     // Helper to safely convert to string and trim
     const safeStr = (val: any) => (val === undefined || val === null) ? '' : String(val).trim();
 
-    // Map fields with multiple possible header names to handle "Judul" vs "Judul Skripsi"
     return jsonData.map((row: any) => ({
         nama: safeStr(row['Nama'] || row['nama'] || row['NAMA']),
         npm: safeStr(row['NPM'] || row['npm'] || row['Nim'] || row['NIM']),
@@ -341,29 +339,32 @@ export const importStudents = async (newStudents: Student[]): Promise<{ added: n
     let added = 0;
     let updated = 0;
 
+    // Helper for aggressive normalization
+    const clean = (str: string) => String(str).toLowerCase().replace(/[^a-z0-9]/g, '');
+
     newStudents.forEach(excelStudent => {
-        // Normalize inputs
         const excelNpm = String(excelStudent.npm || '').trim();
         const excelName = String(excelStudent.nama || '').trim();
         
-        if (!excelNpm && !excelName) return; // Skip empty rows
+        if (!excelNpm && !excelName) return; 
 
-        // STRATEGY: 
-        // We iterate the EXCEL list (source of truth).
-        // For each Excel row, we search the DB to see if it needs update or insert.
-        // This makes the process independent of Excel sorting order.
+        // STRATEGY (UPDATED REQUEST): 
+        // Priority 1: Match by Name. This allows updating NPMs if the name is found.
+        // Priority 2: Match by NPM.
+        
+        let existingIndex = -1;
 
-        // 1. Try finding by NPM (Exact ID match)
-        // We search the entire 'all' array. This is O(N) per row, ensuring sort order doesn't matter.
-        let existingIndex = all.findIndex(s => 
-            String(s.npm).trim().toLowerCase() === excelNpm.toLowerCase() && excelNpm !== ''
-        );
-
-        // 2. If not found by NPM, try finding by Name (Exact Name match)
-        // This handles the case where the user CHANGED the NPM in Excel.
-        if (existingIndex === -1 && excelName) {
+        // 1. Try finding by Name (Robust Name match)
+        if (excelName) {
             existingIndex = all.findIndex(s => 
-                String(s.nama).trim().toLowerCase() === excelName.toLowerCase()
+                clean(s.nama) === clean(excelName)
+            );
+        }
+
+        // 2. If not found by Name, try finding by NPM (Exact ID match)
+        if (existingIndex === -1 && excelNpm) {
+            existingIndex = all.findIndex(s => 
+                String(s.npm).trim().toLowerCase() === excelNpm.toLowerCase()
             );
         }
 
@@ -371,7 +372,7 @@ export const importStudents = async (newStudents: Student[]): Promise<{ added: n
             // UPDATE EXISTING
             // We overwrite ALL fields from Excel to DB
             all[existingIndex] = {
-                ...all[existingIndex], // Keep DB fields (like hidden IDs if any)
+                ...all[existingIndex], // Keep any internal DB fields
                 ...excelStudent,       // Overwrite with Excel data
                 npm: excelNpm,         // Ensure normalized NPM
                 nama: excelName        // Ensure normalized Name
