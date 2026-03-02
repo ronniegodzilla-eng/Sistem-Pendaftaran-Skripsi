@@ -95,4 +95,5 @@ export interface Student {
   pembimbing_2: string;
   penguji_1: string;
   penguji_2: string;
+  bypassProposal?: boolean;
 }
