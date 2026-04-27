@@ -104,7 +104,7 @@ export const AdminScheduling: React.FC = () => {
   };
 
   const handleSchedule = async () => {
-      if (!selectedSubmission || !studentDetails || !date || !time || !endTime || !room) return;
+      if (!selectedSubmission || !date || !time || !endTime || !room) return;
       setProcessing(true);
 
       const newSchedule: Schedule = {
@@ -115,12 +115,12 @@ export const AdminScheduling: React.FC = () => {
           time,
           endTime,
           room,
-          studentName: studentDetails.nama,
-          title: studentDetails.judul_skripsi,
-          pembimbing1: studentDetails.pembimbing_1,
-          pembimbing2: studentDetails.pembimbing_2,
-          penguji1: studentDetails.penguji_1,
-          penguji2: studentDetails.penguji_2,
+          studentName: studentDetails?.nama || selectedSubmission.studentName,
+          title: studentDetails?.judul_skripsi || "Data judul tidak tersedia",
+          pembimbing1: studentDetails?.pembimbing_1 || "-",
+          pembimbing2: studentDetails?.pembimbing_2 || "-",
+          penguji1: studentDetails?.penguji_1 || "-",
+          penguji2: studentDetails?.penguji_2 || "-",
           status: 'upcoming',
           academicYear: db.getActiveYear()
       };
@@ -267,13 +267,20 @@ export const AdminScheduling: React.FC = () => {
         </div>
 
         <div className="lg:col-span-2">
-            {activeTab === 'queue' && selectedSubmission && studentDetails && (
+            {activeTab === 'queue' && selectedSubmission && (
                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6 animate-fade-in relative">
                     {processing && <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={32}/></div>}
                     
                     <h2 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                         <Calendar className="text-indigo-600" /> Form Jadwal Baru
                     </h2>
+
+                    {!studentDetails && (
+                        <div className="mb-4 text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded flex items-start gap-2">
+                            <AlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
+                            <span className="text-sm font-medium">Data induk mahasiswa tidak ditemukan untuk NPM <b>{selectedSubmission.studentNpm}</b>. Beberapa info seperti pembimbing/penguji mungkin kosong.</span>
+                        </div>
+                    )}
                     
                     <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
@@ -339,7 +346,7 @@ export const AdminScheduling: React.FC = () => {
                 </div>
             )}
 
-            {activeTab === 'scheduled' && selectedSchedule && studentDetails && (
+            {activeTab === 'scheduled' && selectedSchedule && (
                 <div className={`bg-white border border-slate-200 rounded-xl shadow-sm p-6 animate-fade-in border-l-4 ${selectedSchedule.status === 'completed' ? 'border-l-slate-400' : 'border-l-green-500'} relative`}>
                      {processing && <div className="absolute inset-0 bg-white/50 z-10 flex items-center justify-center"><Loader2 className="animate-spin text-indigo-600" size={32}/></div>}
                      <div className="flex justify-between items-start mb-4">
