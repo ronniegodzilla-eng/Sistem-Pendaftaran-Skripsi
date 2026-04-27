@@ -251,7 +251,8 @@ export const getAllStudents = async (): Promise<Student[]> => {
 
 export const getStudentByNPM = async (npm: string): Promise<Student | null> => {
     const all = await getAllStudents();
-    return all.find(s => s.npm === npm) || null;
+    const cleanNpm = String(npm).trim().toLowerCase();
+    return all.find(s => String(s.npm).trim().toLowerCase() === cleanNpm) || null;
 };
 
 export const searchStudentsByName = async (name: string): Promise<Student[]> => {
