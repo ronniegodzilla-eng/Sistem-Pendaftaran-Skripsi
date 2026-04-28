@@ -322,16 +322,23 @@ export const parseExcel = (buffer: ArrayBuffer): Student[] => {
     // Helper to safely convert to string and trim
     const safeStr = (val: any) => (val === undefined || val === null) ? '' : String(val).trim();
 
-    return jsonData.map((row: any) => ({
-        nama: safeStr(row['Nama'] || row['nama'] || row['NAMA']),
-        npm: safeStr(row['NPM'] || row['npm'] || row['Nim'] || row['NIM']),
-        prodi: safeStr(row['Prodi'] || row['prodi'] || row['Jurusan']) || 'K3',
-        judul_skripsi: safeStr(row['Judul Skripsi'] || row['Judul'] || row['judul']),
-        pembimbing_1: safeStr(row['Pembimbing 1'] || row['P1'] || row['p1']),
-        pembimbing_2: safeStr(row['Pembimbing 2'] || row['P2'] || row['p2']),
-        penguji_1: safeStr(row['Penguji 1'] || row['U1'] || row['u1']),
-        penguji_2: safeStr(row['Penguji 2'] || row['U2'] || row['u2'])
-    }));
+    return jsonData.map((row: any) => {
+        const getCol = (possibleNames: string[]) => {
+            const rawKey = Object.keys(row).find(k => possibleNames.includes(k.toLowerCase().replace(/[\s_]/g, '')));
+            return rawKey ? row[rawKey] : '';
+        };
+
+        return {
+            nama: safeStr(getCol(['nama', 'name'])),
+            npm: safeStr(getCol(['npm', 'nim', 'id'])) || 'UNKNOWN',
+            prodi: safeStr(getCol(['prodi', 'programstudi', 'jurusan'])) || 'K3',
+            judul_skripsi: safeStr(getCol(['judulskripsi', 'judul', 'title'])),
+            pembimbing_1: safeStr(getCol(['pembimbing1', 'p1', 'dosenpembimbing1'])),
+            pembimbing_2: safeStr(getCol(['pembimbing2', 'p2', 'dosenpembimbing2'])),
+            penguji_1: safeStr(getCol(['penguji1', 'u1', 'dosenpenguji1'])),
+            penguji_2: safeStr(getCol(['penguji2', 'u2', 'dosenpenguji2'])),
+        };
+    });
 };
 
 export const importStudents = async (newStudents: Student[]): Promise<{ added: number; updated: number }> => {
