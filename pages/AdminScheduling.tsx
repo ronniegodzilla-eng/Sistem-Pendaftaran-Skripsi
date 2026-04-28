@@ -116,11 +116,11 @@ export const AdminScheduling: React.FC = () => {
           endTime,
           room,
           studentName: studentDetails?.nama || selectedSubmission.studentName,
-          title: studentDetails?.judul_skripsi || "Data judul tidak tersedia",
-          pembimbing1: studentDetails?.pembimbing_1 || "-",
-          pembimbing2: studentDetails?.pembimbing_2 || "-",
-          penguji1: studentDetails?.penguji_1 || "-",
-          penguji2: studentDetails?.penguji_2 || "-",
+          title: studentDetails?.judul_skripsi && studentDetails.judul_skripsi !== '-' ? studentDetails.judul_skripsi : (selectedSubmission as any).title || "Data judul tidak tersedia",
+          pembimbing1: studentDetails?.pembimbing_1 && studentDetails.pembimbing_1 !== '-' ? studentDetails.pembimbing_1 : "-",
+          pembimbing2: studentDetails?.pembimbing_2 && studentDetails.pembimbing_2 !== '-' ? studentDetails.pembimbing_2 : "-",
+          penguji1: studentDetails?.penguji_1 && studentDetails.penguji_1 !== '-' ? studentDetails.penguji_1 : "-",
+          penguji2: studentDetails?.penguji_2 && studentDetails.penguji_2 !== '-' ? studentDetails.penguji_2 : "-",
           status: 'upcoming',
           academicYear: db.getActiveYear()
       };

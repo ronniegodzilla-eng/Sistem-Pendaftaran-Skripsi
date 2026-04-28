@@ -21,7 +21,52 @@ export const ScheduleStatus: React.FC = () => {
         setLoading(true);
         const loadedSchedules = await db.getSchedules();
         const loadedSubmissions = await db.getSubmissions();
-        setSchedules(loadedSchedules);
+        const { getAllStudents } = await import('../services/studentService');
+        const students = await getAllStudents();
+
+        // Over-patch locally to guarantee late-binding from DB 
+        const locallyPatchedSchedules = loadedSchedules.map(sch => {
+            const sub = loadedSubmissions.find(s => s.id === sch.submissionId);
+            let student = null;
+            if (sub) {
+                student = students.find(s => String(s.npm).trim().toLowerCase() === String(sub.studentNpm).trim().toLowerCase());
+                if (!student) student = students.find(s => String(s.nama).trim().toLowerCase() === String(sub.studentName).trim().toLowerCase());
+            }
+            if (!student) {
+                student = students.find(s => String(s.nama).trim().toLowerCase() === String(sch.studentName).trim().toLowerCase());
+            }
+
+            let { pembimbing1, pembimbing2, penguji1, penguji2, title } = sch;
+
+            if (student) {
+                const isValidVal = (val: any) => val && String(val).trim() !== "" && String(val).trim().toLowerCase() !== "-";
+                const getAnyProp = (obj: any, keys: string[]) => {
+                    for (const k of keys) {
+                        if (isValidVal(obj[k])) return obj[k];
+                    }
+                    return null;
+                };
+
+                const validP1 = getAnyProp(student, ['pembimbing_1', 'pembimbing1', 'p1', 'Pembimbing 1']);
+                if (validP1) pembimbing1 = validP1;
+                const validP2 = getAnyProp(student, ['pembimbing_2', 'pembimbing2', 'p2', 'Pembimbing 2']);
+                if (validP2) pembimbing2 = validP2;
+                const validU1 = getAnyProp(student, ['penguji_1', 'penguji1', 'u1', 'Penguji 1']);
+                if (validU1) penguji1 = validU1;
+                const validU2 = getAnyProp(student, ['penguji_2', 'penguji2', 'u2', 'Penguji 2']);
+                if (validU2) penguji2 = validU2;
+            }
+
+            return {
+                ...sch,
+                pembimbing1,
+                pembimbing2,
+                penguji1,
+                penguji2,
+            };
+        });
+
+        setSchedules(locallyPatchedSchedules);
         setSubmissions(loadedSubmissions);
         
         // Pre-fetch revision requirements for all submission types
