@@ -2,6 +2,7 @@
 import { Submission, Schedule, FileRequirement } from '../types';
 import { PROPOSAL_REQUIREMENTS, SKRIPSI_REQUIREMENTS, PROPOSAL_REVISION_REQUIREMENTS, SKRIPSI_REVISION_REQUIREMENTS } from '../constants';
 import { supabase } from './supabase';
+import { getAllStudents } from './studentService';
 
 // This simulates a backend database with Persistence
 class MockDatabase {
@@ -335,16 +336,51 @@ class MockDatabase {
 
   // 4. SCHEDULES
   async getSchedules(): Promise<Schedule[]> {
+      let rawSchedules = [...this.schedules];
       if (supabase) {
           const { data, error } = await supabase.from('schedules').select('*');
           if (error) {
               console.error("Supabase fetch schedules error:", error);
           } else if (data) {
               this.schedules = data as Schedule[];
-              return this.schedules;
+              rawSchedules = this.schedules;
           }
       }
-      return new Promise(resolve => setTimeout(() => resolve([...this.schedules]), 300));
+      
+      const students = await getAllStudents();
+      const allSubs = await this.getSubmissions();
+      
+      // Patch with the latest real-time student configuration (pembimbing and penguji)
+      const patchedSchedules = rawSchedules.map(sch => {
+          let pembimbing1 = sch.pembimbing1;
+          let pembimbing2 = sch.pembimbing2;
+          let penguji1 = sch.penguji1;
+          let penguji2 = sch.penguji2;
+          let title = sch.title;
+          
+          const sub = allSubs.find(s => s.id === sch.submissionId);
+          if (sub) {
+              const student = students.find(s => String(s.npm).trim().toLowerCase() === String(sub.studentNpm).trim().toLowerCase());
+              if (student) {
+                  pembimbing1 = student.pembimbing_1 || "-";
+                  pembimbing2 = student.pembimbing_2 || "-";
+                  penguji1 = student.penguji_1 || "-";
+                  penguji2 = student.penguji_2 || "-";
+                  title = student.judul_skripsi || "Data judul tidak tersedia";
+              }
+          }
+          
+          return {
+              ...sch,
+              pembimbing1,
+              pembimbing2,
+              penguji1,
+              penguji2,
+              title
+          };
+      });
+      
+      return patchedSchedules;
   }
 
   async getUpcomingSchedules(days: number = 3): Promise<Schedule[]> {
