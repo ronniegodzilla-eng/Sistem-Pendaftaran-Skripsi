@@ -5,6 +5,36 @@ import { supabase } from './supabase';
 import { getAllStudents } from './studentService';
 
 // This simulates a backend database with Persistence
+const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+const isSimilarName = (n1: string, n2: string) => {
+    const s1 = normalizeName(n1);
+    const s2 = normalizeName(n2);
+    if (!s1 || !s2) return false;
+    if (s1 === s2) return true;
+    if (s1.length > 10 && s2.length > 10 && (s1.includes(s2) || s2.includes(s1))) return true;
+    
+    // Levenshtein distance
+    const track = Array(s2.length + 1).fill(null).map(() =>
+      Array(s1.length + 1).fill(null));
+    for (let i = 0; i <= s1.length; i += 1) track[0][i] = i;
+    for (let j = 0; j <= s2.length; j += 1) track[j][0] = j;
+    
+    for (let j = 1; j <= s2.length; j += 1) {
+      for (let i = 1; i <= s1.length; i += 1) {
+        const indicator = s1[i - 1] === s2[j - 1] ? 0 : 1;
+        track[j][i] = Math.min(
+          track[j][i - 1] + 1,
+          track[j - 1][i] + 1,
+          track[j - 1][i - 1] + indicator,
+        );
+      }
+    }
+    const dist = track[s2.length][s1.length];
+    const threshold = s1.length > 15 ? 3 : (s1.length > 10 ? 2 : 1);
+    return dist <= threshold;
+};
+
 class MockDatabase {
   private submissions: Submission[] = [];
   private schedules: Schedule[] = [];
@@ -522,7 +552,7 @@ class MockDatabase {
 
     const newPeople = [newSchedule.pembimbing1, newSchedule.pembimbing2, newSchedule.penguji1, newSchedule.penguji2]
         .map(p => p.trim())
-        .filter(p => p && p !== '-' && p.toLowerCase() !== 'dosen p1' && p.toLowerCase() !== 'dosen p2'); 
+        .filter(p => !!p && p !== '-' && !p.toLowerCase().startsWith('dosen')); 
 
     for (const s of latestSchedules) {
         if (s.id === newSchedule.id) continue;
@@ -540,9 +570,9 @@ class MockDatabase {
 
                 const existingPeople = [s.pembimbing1, s.pembimbing2, s.penguji1, s.penguji2]
                     .map(p => p.trim())
-                    .filter(p => p && p !== '-');
+                    .filter(p => !!p && p !== '-' && !p.toLowerCase().startsWith('dosen'));
                 
-                const conflictingPerson = existingPeople.find(p => newPeople.includes(p));
+                const conflictingPerson = existingPeople.find(p => newPeople.some(n => isSimilarName(p, n)));
                 if (conflictingPerson) {
                     return `KONFLIK DOSEN: Dosen "${conflictingPerson}" bertugas di sidang ${s.studentName} (${s.type}) pukul ${s.time}-${s.endTime}.`;
                 }
