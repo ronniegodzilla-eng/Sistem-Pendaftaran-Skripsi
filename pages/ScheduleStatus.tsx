@@ -1,8 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../services/mockDb';
 import { Schedule, Submission } from '../types';
-import { Search, Calendar, Clock, X, AlertCircle, FileText, CheckCircle2, Loader2 } from 'lucide-react';
+import { Search, Calendar, Clock, X, AlertCircle, FileText, CheckCircle2, Loader2, ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
+
+const SortIndicator = ({ columnKey, sortConfig }: { columnKey: string, sortConfig: { key: string | number | symbol, direction: 'asc'|'desc'} | null }) => {
+    if (sortConfig?.key !== columnKey) return <ArrowUpDown size={14} className="inline ml-1 text-slate-300" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp size={14} className="inline ml-1 text-indigo-500" /> : <ArrowDown size={14} className="inline ml-1 text-indigo-500" />;
+};
 
 export const ScheduleStatus: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'schedule' | 'status'>('schedule');
@@ -15,6 +20,54 @@ export const ScheduleStatus: React.FC = () => {
 
   const [revisionRequirements, setRevisionRequirements] = useState<Record<string, FileRequirement[]>>({});
   const [requirements, setRequirements] = useState<Record<string, FileRequirement[]>>({});
+
+  const [sortConfigSchedule, setSortConfigSchedule] = useState<{ key: keyof Schedule, direction: 'asc' | 'desc' } | null>(null);
+  const [sortConfigStatus, setSortConfigStatus] = useState<{ key: keyof Submission, direction: 'asc' | 'desc' } | null>(null);
+
+  const handleSortSchedule = (key: keyof Schedule) => {
+      let direction: 'asc' | 'desc' = 'asc';
+      if (sortConfigSchedule && sortConfigSchedule.key === key && sortConfigSchedule.direction === 'asc') {
+          direction = 'desc';
+      }
+      setSortConfigSchedule({ key, direction });
+  };
+
+  const handleSortStatus = (key: keyof Submission) => {
+      let direction: 'asc' | 'desc' = 'asc';
+      if (sortConfigStatus && sortConfigStatus.key === key && sortConfigStatus.direction === 'asc') {
+          direction = 'desc';
+      }
+      setSortConfigStatus({ key, direction });
+  };
+
+  const sortedSchedules = useMemo(() => {
+        let sortableSchedules = [...schedules];
+        if (sortConfigSchedule !== null) {
+            sortableSchedules.sort((a, b) => {
+                let valA = a[sortConfigSchedule.key];
+                let valB = b[sortConfigSchedule.key];
+                if (valA < valB) return sortConfigSchedule.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sortConfigSchedule.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return sortableSchedules;
+  }, [schedules, sortConfigSchedule]);
+
+  const sortedSubmissions = useMemo(() => {
+        let sortableSubmissions = [...submissions];
+        if (sortConfigStatus !== null) {
+            sortableSubmissions.sort((a, b) => {
+                let valA = a[sortConfigStatus.key];
+                let valB = b[sortConfigStatus.key];
+                if (valA < valB) return sortConfigStatus.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sortConfigStatus.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+        }
+        return sortableSubmissions;
+  }, [submissions, sortConfigStatus]);
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -190,19 +243,29 @@ export const ScheduleStatus: React.FC = () => {
                     <table className="min-w-full divide-y divide-slate-200">
                         <thead className="bg-slate-50">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Mahasiswa</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Jenis</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Jadwal</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Ruang</th>
+                                <th onClick={() => handleSortSchedule('studentName')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Mahasiswa <SortIndicator columnKey="studentName" sortConfig={sortConfigSchedule} />
+                                </th>
+                                <th onClick={() => handleSortSchedule('type')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Jenis <SortIndicator columnKey="type" sortConfig={sortConfigSchedule} />
+                                </th>
+                                <th onClick={() => handleSortSchedule('date')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Jadwal <SortIndicator columnKey="date" sortConfig={sortConfigSchedule} />
+                                </th>
+                                <th onClick={() => handleSortSchedule('room')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Ruang <SortIndicator columnKey="room" sortConfig={sortConfigSchedule} />
+                                </th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Pembimbing & Penguji</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th>
+                                <th onClick={() => handleSortSchedule('status')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Status <SortIndicator columnKey="status" sortConfig={sortConfigSchedule} />
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-200">
-                            {schedules.filter(s => s.studentName.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 ? (
+                            {sortedSchedules.filter(s => s.studentName.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 ? (
                                 <tr><td colSpan={6} className="p-8 text-center text-slate-500 italic">Tidak ada jadwal.</td></tr>
                             ) : (
-                                schedules.filter(s => s.studentName.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
+                                sortedSchedules.filter(s => s.studentName.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
                                     <tr key={item.id} className="hover:bg-slate-50">
                                         <td className="px-6 py-4">
                                             <p className="text-sm font-bold text-slate-900">{item.studentName}</p>
@@ -232,14 +295,22 @@ export const ScheduleStatus: React.FC = () => {
                     <table className="min-w-full divide-y divide-slate-200">
                         <thead className="bg-slate-50">
                             <tr>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Nama & NPM</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Tahapan</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Tanggal</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th>
+                                <th onClick={() => handleSortStatus('studentName')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Nama & NPM <SortIndicator columnKey="studentName" sortConfig={sortConfigStatus} />
+                                </th>
+                                <th onClick={() => handleSortStatus('type')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Tahapan <SortIndicator columnKey="type" sortConfig={sortConfigStatus} />
+                                </th>
+                                <th onClick={() => handleSortStatus('submittedAt')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Tanggal <SortIndicator columnKey="submittedAt" sortConfig={sortConfigStatus} />
+                                </th>
+                                <th onClick={() => handleSortStatus('status')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Status <SortIndicator columnKey="status" sortConfig={sortConfigStatus} />
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-200">
-                             {submissions.filter(s => s.studentName.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
+                             {sortedSubmissions.filter(s => s.studentName.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
                                   <tr key={item.id} className="hover:bg-slate-50">
                                       <td className="px-6 py-4">
                                           <p className="text-sm font-bold">{item.studentName}</p>
