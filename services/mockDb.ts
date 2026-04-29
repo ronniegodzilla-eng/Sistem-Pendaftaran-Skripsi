@@ -585,13 +585,36 @@ class MockDatabase {
   async getStats() {
       const all = await this.getSubmissions(); 
       const schedules = await this.getSchedules();
+      const students = await getAllStudents();
+
+      const normalizeProdi = (p: string) => String(p).trim().toLowerCase();
+      const isK3 = (p: string) => normalizeProdi(p).includes('k3');
+      const isKesling = (p: string) => normalizeProdi(p).includes('kesling') || normalizeProdi(p).includes('kesehatan lingkungan');
+
+      const hasProposalSet = new Set(all.filter(s => s.type === 'proposal').map(s => s.studentNpm));
+      const hasSkripsiSet = new Set(all.filter(s => s.type === 'skripsi').map(s => s.studentNpm));
+      const lulusProposalSet = new Set(all.filter(s => s.type === 'proposal' && s.status === 'proposal_completed').map(s => s.studentNpm));
+
+      const belumProposal = students.filter(student => !student.bypassProposal && !hasProposalSet.has(student.npm));
+      
+      const belumSkripsi = students.filter(student => {
+          if (hasSkripsiSet.has(student.npm)) return false;
+          if (student.bypassProposal) return true;
+          if (lulusProposalSet.has(student.npm)) return true;
+          return false;
+      });
 
       return {
           total: all.length,
           proposal_passed: all.filter(s => s.status === 'proposal_completed').length,
           skripsi_passed: all.filter(s => s.status === 'skripsi_completed').length,
           pending_revision: all.filter(s => s.status === 'revision_proposal_pending' || s.status === 'revision_skripsi_pending').length,
-          upcoming_exams: schedules.filter(s => s.status === 'upcoming').length
+          upcoming_exams: schedules.filter(s => s.status === 'upcoming').length,
+          
+          unregistered_proposal_k3: belumProposal.filter(s => isK3(s.prodi)).length,
+          unregistered_proposal_kesling: belumProposal.filter(s => isKesling(s.prodi)).length,
+          unregistered_skripsi_k3: belumSkripsi.filter(s => isK3(s.prodi)).length,
+          unregistered_skripsi_kesling: belumSkripsi.filter(s => isKesling(s.prodi)).length,
       };
   }
 
