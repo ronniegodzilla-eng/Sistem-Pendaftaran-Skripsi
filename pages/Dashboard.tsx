@@ -17,7 +17,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       proposal_passed: 0,
       skripsi_passed: 0,
       pending_revision: 0,
-      upcoming_exams: 0
+      upcoming_exams: 0,
+      unregistered_proposal_k3: 0,
+      unregistered_proposal_kesling: 0,
+      unregistered_skripsi_k3: 0,
+      unregistered_skripsi_kesling: 0
   });
 
   useEffect(() => {
@@ -59,7 +63,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col items-center justify-center text-center hover:border-indigo-300 transition-colors">
                   <div className="bg-blue-100 p-2 rounded-full mb-2 text-blue-600">
                       <Users size={24} />
@@ -87,6 +91,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   </div>
                   <span className="text-2xl font-bold text-slate-900">{stats.pending_revision}</span>
                   <span className="text-xs text-slate-500 uppercase font-semibold">Dalam Revisi</span>
+              </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
+                  <div>
+                      <h3 className="font-bold text-slate-800 text-sm mb-1">Belum Mendaftar Proposal</h3>
+                  </div>
+                  <div className="flex gap-4">
+                      <div className="text-center">
+                          <p className="text-sm font-semibold text-slate-500 uppercase">K3</p>
+                          <p className="text-xl font-bold text-amber-600">{stats.unregistered_proposal_k3}</p>
+                      </div>
+                      <div className="w-px bg-slate-200"></div>
+                      <div className="text-center">
+                          <p className="text-sm font-semibold text-slate-500 uppercase">Kesling</p>
+                          <p className="text-xl font-bold text-sky-600">{stats.unregistered_proposal_kesling}</p>
+                      </div>
+                  </div>
+              </div>
+              
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
+                  <div>
+                      <h3 className="font-bold text-slate-800 text-sm mb-1">Belum Mendaftar Skripsi</h3>
+                      <p className="text-xs text-slate-500 max-w-[200px]">Sudah lulus proposal tetapi belum mendaftar skripsi.</p>
+                  </div>
+                  <div className="flex gap-4">
+                      <div className="text-center">
+                          <p className="text-sm font-semibold text-slate-500 uppercase">K3</p>
+                          <p className="text-xl font-bold text-amber-600">{stats.unregistered_skripsi_k3}</p>
+                      </div>
+                      <div className="w-px bg-slate-200"></div>
+                      <div className="text-center">
+                          <p className="text-sm font-semibold text-slate-500 uppercase">Kesling</p>
+                          <p className="text-xl font-bold text-sky-600">{stats.unregistered_skripsi_kesling}</p>
+                      </div>
+                  </div>
               </div>
           </div>
       </div>
