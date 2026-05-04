@@ -116,11 +116,22 @@ export const ScheduleStatus: React.FC = () => {
                 pembimbing2,
                 penguji1,
                 penguji2,
+                prodi: student?.prodi || '-'
+            };
+        });
+
+        const locallyPatchedSubmissions = loadedSubmissions.map(sub => {
+            let student = students.find(s => String(s.npm).trim().toLowerCase() === String(sub.studentNpm).trim().toLowerCase());
+            if (!student) student = students.find(s => String(s.nama).trim().toLowerCase() === String(sub.studentName).trim().toLowerCase());
+            
+            return {
+                ...sub,
+                prodi: student?.prodi || '-'
             };
         });
 
         setSchedules(locallyPatchedSchedules);
-        setSubmissions(loadedSubmissions);
+        setSubmissions(locallyPatchedSubmissions);
         
         // Pre-fetch revision requirements for all submission types
         const propReqs = await db.getRevisionRequirements('proposal');
@@ -246,6 +257,9 @@ export const ScheduleStatus: React.FC = () => {
                                 <th onClick={() => handleSortSchedule('studentName')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
                                     Mahasiswa <SortIndicator columnKey="studentName" sortConfig={sortConfigSchedule} />
                                 </th>
+                                <th onClick={() => handleSortSchedule('prodi')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Prodi <SortIndicator columnKey="prodi" sortConfig={sortConfigSchedule} />
+                                </th>
                                 <th onClick={() => handleSortSchedule('type')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
                                     Jenis <SortIndicator columnKey="type" sortConfig={sortConfigSchedule} />
                                 </th>
@@ -263,13 +277,14 @@ export const ScheduleStatus: React.FC = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-200">
                             {sortedSchedules.filter(s => s.studentName.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 ? (
-                                <tr><td colSpan={6} className="p-8 text-center text-slate-500 italic">Tidak ada jadwal.</td></tr>
+                                <tr><td colSpan={7} className="p-8 text-center text-slate-500 italic">Tidak ada jadwal.</td></tr>
                             ) : (
                                 sortedSchedules.filter(s => s.studentName.toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
                                     <tr key={item.id} className="hover:bg-slate-50">
                                         <td className="px-6 py-4">
                                             <p className="text-sm font-bold text-slate-900">{item.studentName}</p>
                                         </td>
+                                        <td className="px-6 py-4"><span className="text-sm text-slate-600">{item.prodi}</span></td>
                                         <td className="px-6 py-4"><span className="text-xs font-bold uppercase">{item.type}</span></td>
                                         <td className="px-6 py-4 text-sm">{item.date} <br/><span className="text-slate-500">{item.time}-{item.endTime}</span></td>
                                         <td className="px-6 py-4 text-sm">{item.room}</td>
@@ -298,6 +313,9 @@ export const ScheduleStatus: React.FC = () => {
                                 <th onClick={() => handleSortStatus('studentName')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
                                     Nama & NPM <SortIndicator columnKey="studentName" sortConfig={sortConfigStatus} />
                                 </th>
+                                <th onClick={() => handleSortStatus('prodi')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
+                                    Prodi <SortIndicator columnKey="prodi" sortConfig={sortConfigStatus} />
+                                </th>
                                 <th onClick={() => handleSortStatus('type')} className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase cursor-pointer hover:bg-slate-100 transition-colors group">
                                     Tahapan <SortIndicator columnKey="type" sortConfig={sortConfigStatus} />
                                 </th>
@@ -316,6 +334,7 @@ export const ScheduleStatus: React.FC = () => {
                                           <p className="text-sm font-bold">{item.studentName}</p>
                                           <p className="text-xs text-slate-500">{item.studentNpm}</p>
                                       </td>
+                                      <td className="px-6 py-4 text-sm text-slate-600">{item.prodi}</td>
                                       <td className="px-6 py-4 text-xs font-bold uppercase">{item.type}</td>
                                       <td className="px-6 py-4 text-sm">{new Date(item.submittedAt).toLocaleDateString()}</td>
                                       <td className="px-6 py-4">{getStatusLabel(item)}</td>
