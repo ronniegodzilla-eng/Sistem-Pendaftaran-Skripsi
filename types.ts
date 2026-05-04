@@ -53,6 +53,7 @@ export interface Submission {
   id: string;
   studentNpm: string;
   studentName: string;
+  prodi?: string;
   type: 'proposal' | 'skripsi';
   files: SubmissionState;
   validations: { [fileId: string]: ValidationItem }; 
@@ -70,6 +71,7 @@ export interface Schedule {
   endTime: string;  // End Time
   room: string;
   studentName: string;
+  prodi?: string;
   title: string;
   pembimbing1: string;
   pembimbing2: string;
