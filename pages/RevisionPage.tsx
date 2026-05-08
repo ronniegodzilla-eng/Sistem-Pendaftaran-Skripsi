@@ -80,7 +80,7 @@ export const RevisionPage: React.FC<RevisionPageProps> = ({
       setSuggestions([]);
       setSearchError('');
 
-      const existing = await db.getSubmissionByNpm(selected.npm, type);
+      const existing = await db.getSubmissionByNpm(selected.npm, type, selected.nama);
       
       if (!existing) {
           setSearchError('Anda belum mendaftar tahap ini.');
@@ -151,7 +151,7 @@ export const RevisionPage: React.FC<RevisionPageProps> = ({
 
     setIsSubmitting(true);
     
-    const existing = await db.getSubmissionByNpm(student.npm, type);
+    const existing = await db.getSubmissionByNpm(student.npm, type, student.nama);
     if(existing) {
         await db.submitRevision(existing.id, files);
     }

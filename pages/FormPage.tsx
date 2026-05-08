@@ -87,7 +87,7 @@ export const FormPage: React.FC<FormPageProps> = ({
 
       if (pageId === 'skripsi') {
           if (!selected.bypassProposal) {
-              const proposal = await db.getSubmissionByNpm(selected.npm, 'proposal');
+              const proposal = await db.getSubmissionByNpm(selected.npm, 'proposal', selected.nama);
               if (!proposal || proposal.status !== 'proposal_completed') {
                    setSearchError('Anda harus menyelesaikan Seminar Proposal dan Revisi Proposal (Status: Sempro Selesai) sebelum mendaftar Skripsi.');
                    setStudent(null);
@@ -96,7 +96,7 @@ export const FormPage: React.FC<FormPageProps> = ({
           }
       }
       
-      const existing = await db.getSubmissionByNpm(selected.npm, pageId === 'proposal' ? 'proposal' : 'skripsi');
+      const existing = await db.getSubmissionByNpm(selected.npm, pageId === 'proposal' ? 'proposal' : 'skripsi', selected.nama);
       
       if (existing) {
         if (existing.status !== 'rejected') {
@@ -170,7 +170,7 @@ export const FormPage: React.FC<FormPageProps> = ({
 
     setIsSubmitting(true);
     
-    const existing = await db.getSubmissionByNpm(student.npm, pageId === 'proposal' ? 'proposal' : 'skripsi');
+    const existing = await db.getSubmissionByNpm(student.npm, pageId === 'proposal' ? 'proposal' : 'skripsi', student.nama);
     
     const newSubmission = {
       id: existing ? existing.id : Date.now().toString(),
