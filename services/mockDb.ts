@@ -226,9 +226,12 @@ class MockDatabase {
       });
   }
 
-  async getSubmissionByNpm(npm: string, type: 'proposal' | 'skripsi'): Promise<Submission | undefined> {
+  async getSubmissionByNpm(npm: string, type: 'proposal' | 'skripsi', name?: string): Promise<Submission | undefined> {
       const all = await this.getSubmissions();
-      return all.find(s => s.studentNpm === npm && s.type === type);
+      return all.find(s => 
+          (s.studentNpm === npm || (name && s.studentName.toLowerCase() === name.toLowerCase())) 
+          && s.type === type
+      );
   }
 
   // 2. ADD / UPDATE SUBMISSION
