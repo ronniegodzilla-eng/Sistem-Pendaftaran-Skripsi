@@ -1,5 +1,6 @@
 
-import { supabase } from './supabase';
+import { db } from './firebase';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { Student } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -231,11 +232,12 @@ const saveStudentsToStorage = (students: Student[]) => {
 };
 
 export const getAllStudents = async (): Promise<Student[]> => {
-    // 1. Try Supabase
-    if (supabase) {
-        const { data, error } = await supabase.from('students').select('*');
-        if (!error && data && data.length > 0) {
-            cachedStudents = data as Student[];
+    // 1. Try Firebase
+    if (db) {
+        const snapshot = await getDocs(collection(db, 'students'));
+        const data = snapshot.docs.map(d => ({ ...d.data() })) as Student[];
+        if (data && data.length > 0) {
+            cachedStudents = data;
             saveStudentsToStorage(cachedStudents);
             return cachedStudents;
         }
@@ -270,8 +272,8 @@ export const addStudent = async (student: Student): Promise<{ success: boolean; 
     all.push(student);
     saveStudentsToStorage(all);
 
-    if (supabase) {
-        await supabase.from('students').insert(student);
+    if (db) {
+        await setDoc(doc(db, 'students', student.npm), student);
     }
     return { success: true, message: 'Berhasil menambah data mahasiswa.' };
 };
@@ -283,8 +285,8 @@ export const updateStudent = async (npm: string, data: Student): Promise<void> =
         all[index] = { ...all[index], ...data };
         saveStudentsToStorage(all);
 
-        if (supabase) {
-            await supabase.from('students').update(data).eq('npm', npm);
+        if (db) {
+            await updateDoc(doc(db, 'students', npm), data as any);
         }
     }
 };
@@ -294,8 +296,10 @@ export const deleteStudents = async (npms: string[]): Promise<void> => {
     const filtered = all.filter(s => !npms.includes(s.npm));
     saveStudentsToStorage(filtered);
 
-    if (supabase) {
-        await supabase.from('students').delete().in('npm', npms);
+    if (db) {
+        const batch = writeBatch(db);
+        npms.forEach(npm => batch.delete(doc(db, 'students', npm)));
+        await batch.commit();
     }
 };
 
@@ -306,8 +310,10 @@ export const restoreStudents = async (students: Student[]): Promise<void> => {
     const merged = [...all, ...toAdd];
     saveStudentsToStorage(merged);
 
-    if (supabase && toAdd.length > 0) {
-        await supabase.from('students').insert(toAdd);
+    if (db && toAdd.length > 0) {
+        const batch = writeBatch(db);
+        toAdd.forEach(s => batch.set(doc(db, 'students', s.npm), s));
+        await batch.commit();
     }
 };
 
@@ -394,7 +400,14 @@ export const importStudents = async (newStudents: Student[]): Promise<{ added: n
     });
 
     saveStudentsToStorage(all);
-    if (supabase) await supabase.from('students').upsert(all);
+    if (db) {
+        for (let i = 0; i < all.length; i += 499) {
+            const chunk = all.slice(i, i + 499);
+            const batch = writeBatch(db);
+            chunk.forEach(s => batch.set(doc(db, 'students', s.npm), s));
+            await batch.commit();
+        }
+    }
 
     return { added, updated };
 };
