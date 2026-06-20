@@ -35,7 +35,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             setOverdueRevisions(ov);
             setStats(st);
         } catch (e) {
-            console.error("Failed to load dashboard data", e);
+            console.warn("Failed to load dashboard data");
         } finally {
             setLoading(false);
         }

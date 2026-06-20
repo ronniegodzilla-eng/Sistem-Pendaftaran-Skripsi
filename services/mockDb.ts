@@ -1,7 +1,8 @@
 
 import { Submission, Schedule, FileRequirement } from '../types';
 import { PROPOSAL_REQUIREMENTS, SKRIPSI_REQUIREMENTS, PROPOSAL_REVISION_REQUIREMENTS, SKRIPSI_REVISION_REQUIREMENTS } from '../constants';
-import { supabase } from './supabase';
+import { db as firebaseDb } from './firebase';
+import { collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { getAllStudents } from './studentService';
 
 // This simulates a backend database with Persistence
@@ -88,7 +89,7 @@ class MockDatabase {
       this.saveToStorage();
       
       // Sync Supabase if active (Basic wipe and replace logic for demo)
-      if (supabase) {
+      if (firebaseDb) {
           // Complex sync logic skipped for demo simplicity, assuming LocalStorage is primary for current session
       }
       return new Promise(resolve => setTimeout(resolve, 500));
@@ -101,10 +102,16 @@ class MockDatabase {
       this.schedules = [];
       this.saveToStorage();
 
-      if (supabase) {
-          // Note: In a real Supabase scenario, you'd need RLS policies allowing delete
-          await supabase.from('submissions').delete().neq('id', '0'); // Delete all
-          await supabase.from('schedules').delete().neq('id', '0');   // Delete all
+      if (firebaseDb) {
+          const batch = writeBatch(firebaseDb);
+          
+          const subsSnapshot = await getDocs(collection(firebaseDb, 'submissions'));
+          subsSnapshot.docs.forEach(d => batch.delete(doc(firebaseDb, 'submissions', d.id)));
+          
+          const schedSnapshot = await getDocs(collection(firebaseDb, 'schedules'));
+          schedSnapshot.docs.forEach(d => batch.delete(doc(firebaseDb, 'schedules', d.id)));
+          
+          await batch.commit();
       }
       
       // Artificial delay for UI feedback
@@ -117,11 +124,12 @@ class MockDatabase {
 
   // --- Requirements Management (Sync for UI speed) ---
   async getRequirements(type: 'proposal' | 'skripsi'): Promise<FileRequirement[]> {
-      if (supabase) {
-          const { data, error } = await supabase.from('settings').select('value').eq('key', `req_${type}`).single();
-          if (!error && data && data.value) {
-              if (type === 'proposal') this.proposalRequirements = data.value;
-              else this.skripsiRequirements = data.value;
+      if (firebaseDb) {
+          const docSnap = await getDoc(doc(firebaseDb, 'settings', `req_${type}`));
+          if (docSnap.exists() && docSnap.data().value) {
+              const value = docSnap.data().value;
+              if (type === 'proposal') this.proposalRequirements = value;
+              else this.skripsiRequirements = value;
           }
       }
       return type === 'proposal' ? this.proposalRequirements : this.skripsiRequirements;
@@ -131,21 +139,18 @@ class MockDatabase {
       if (type === 'proposal') this.proposalRequirements = newReqs;
       else this.skripsiRequirements = newReqs;
       
-      if (supabase) {
-          const { error } = await supabase.from('settings').upsert({ key: `req_${type}`, value: newReqs });
-          if (error) {
-              console.error("Supabase Update Req Error:", error);
-              alert("Gagal menyimpan pengaturan syarat ke Supabase: " + error.message);
-          }
+      if (firebaseDb) {
+          await setDoc(doc(firebaseDb, 'settings', `req_${type}`), { value: newReqs });
       }
   }
 
   async getRevisionRequirements(type: 'proposal' | 'skripsi'): Promise<FileRequirement[]> {
-      if (supabase) {
-          const { data, error } = await supabase.from('settings').select('value').eq('key', `revision_req_${type}`).single();
-          if (!error && data && data.value) {
-              if (type === 'proposal') this.proposalRevisionRequirements = data.value;
-              else this.skripsiRevisionRequirements = data.value;
+      if (firebaseDb) {
+          const docSnap = await getDoc(doc(firebaseDb, 'settings', `revision_req_${type}`));
+          if (docSnap.exists() && docSnap.data().value) {
+              const value = docSnap.data().value;
+              if (type === 'proposal') this.proposalRevisionRequirements = value;
+              else this.skripsiRevisionRequirements = value;
           }
       }
       return type === 'proposal' ? this.proposalRevisionRequirements : this.skripsiRevisionRequirements;
@@ -155,22 +160,16 @@ class MockDatabase {
       if (type === 'proposal') this.proposalRevisionRequirements = newReqs;
       else this.skripsiRevisionRequirements = newReqs;
       
-      if (supabase) {
-          const { error } = await supabase.from('settings').upsert({ key: `revision_req_${type}`, value: newReqs });
-          if (error) {
-              console.error("Supabase Update Revision Req Error:", error);
-              alert("Gagal menyimpan pengaturan syarat revisi ke Supabase: " + error.message);
-          }
+      if (firebaseDb) {
+          await setDoc(doc(firebaseDb, 'settings', `revision_req_${type}`), { value: newReqs });
       }
   }
 
   async getRooms(): Promise<string[]> {
-      if (supabase) {
-          const { data, error } = await supabase.from('rooms').select('name');
-          if (!error && data) {
-              this.rooms = data.map(d => d.name);
-              return this.rooms;
-          }
+      if (firebaseDb) {
+          const snapshot = await getDocs(collection(firebaseDb, 'rooms'));
+          this.rooms = snapshot.docs.map(d => d.id);
+          return this.rooms;
       }
       return new Promise(resolve => setTimeout(() => resolve([...this.rooms]), 300));
   }
@@ -180,12 +179,8 @@ class MockDatabase {
           this.rooms.push(roomName);
           this.saveToStorage();
           
-          if (supabase) {
-              const { error } = await supabase.from('rooms').insert({ name: roomName });
-              if (error) {
-                  console.error("Supabase Insert Room Error:", error);
-                  alert("Gagal menyimpan ruangan ke Supabase: " + error.message);
-              }
+          if (firebaseDb) {
+              await setDoc(doc(firebaseDb, 'rooms', roomName), { name: roomName });
           }
       }
   }
@@ -194,12 +189,8 @@ class MockDatabase {
       this.rooms = this.rooms.filter(r => r !== roomName);
       this.saveToStorage();
       
-      if (supabase) {
-          const { error } = await supabase.from('rooms').delete().eq('name', roomName);
-          if (error) {
-              console.error("Supabase Delete Room Error:", error);
-              alert("Gagal menghapus ruangan di Supabase: " + error.message);
-          }
+      if (firebaseDb) {
+          await deleteDoc(doc(firebaseDb, 'rooms', roomName));
       }
   }
 
@@ -207,16 +198,14 @@ class MockDatabase {
 
   // 1. GET SUBMISSIONS
   async getSubmissions(): Promise<Submission[]> {
-      // 1. Try Supabase if connected
-      if (supabase) {
-          const { data, error } = await supabase.from('submissions').select('*');
-          if (error) {
-              console.error("Supabase fetch error:", error);
-          } else if (data) {
-              // Always return Supabase data if connected, even if empty, 
-              // so it doesn't confusingly fall back to local storage.
-              this.submissions = data as unknown as Submission[];
-              return this.submissions; 
+      // 1. Try Firebase if connected
+      if (firebaseDb) {
+          try {
+              const snapshot = await getDocs(collection(firebaseDb, 'submissions'));
+              this.submissions = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Submission[];
+              return this.submissions;
+          } catch (error) {
+              console.warn("Firebase fetch error:");
           }
       }
       
@@ -246,7 +235,7 @@ class MockDatabase {
       this.saveToStorage();
 
       // Update Supabase
-      if (supabase) {
+      if (firebaseDb) {
           // Sanitize files to remove non-serializable JS File objects before sending to Supabase
           const cleanSubmission = { ...submission };
           const cleanFiles: any = {};
@@ -262,10 +251,11 @@ class MockDatabase {
           }
           cleanSubmission.files = cleanFiles;
 
-          const { error } = await supabase.from('submissions').upsert(cleanSubmission);
-          if (error) {
-              console.error("Supabase Error:", error);
-              alert("Gagal menyimpan ke Supabase: " + error.message + "\nPastikan RLS (Row Level Security) di tabel 'submissions' sudah di-disable atau di-configure.");
+          try {
+              await setDoc(doc(firebaseDb, 'submissions', cleanSubmission.id), cleanSubmission);
+          } catch (error: any) {
+              console.warn("Firebase Error:");
+              // alert("Gagal menyimpan ke Firebase: " + error.message);
           }
       }
   }
@@ -277,7 +267,7 @@ class MockDatabase {
         sub.validations = {}; 
         this.saveToStorage();
 
-        if (supabase) {
+        if (firebaseDb) {
              const cleanFiles: any = {};
              if (sub.files) {
                  Object.keys(sub.files).forEach(key => {
@@ -289,10 +279,11 @@ class MockDatabase {
                      };
                  });
              }
-             const { error } = await supabase.from('submissions').update({ files: cleanFiles, validations: {} }).eq('id', submissionId);
-             if (error) {
-                 console.error("Supabase Error:", error);
-                 alert("Gagal menyimpan revisi ke Supabase: " + error.message);
+             try {
+                 await updateDoc(doc(firebaseDb, 'submissions', submissionId), { files: cleanFiles, validations: {} });
+             } catch (error: any) {
+                 console.warn("Firebase Error:");
+                 // alert("Gagal menyimpan revisi ke Firebase: " + error.message);
              }
         }
       }
@@ -323,11 +314,12 @@ class MockDatabase {
       }
       this.saveToStorage();
 
-      if (supabase) {
-          const { error } = await supabase.from('submissions').update({ validations: sub.validations, status: sub.status }).eq('id', submissionId);
-          if (error) {
-              console.error("Supabase Error:", error);
-              alert("Gagal memvalidasi di Supabase: " + error.message);
+      if (firebaseDb) {
+          try {
+              await updateDoc(doc(firebaseDb, 'submissions', submissionId), { validations: sub.validations, status: sub.status });
+          } catch (error: any) {
+              console.warn("Firebase Error:");
+              // alert("Gagal memvalidasi di Firebase: " + error.message);
           }
       }
     }
@@ -344,11 +336,12 @@ class MockDatabase {
       }
       this.saveToStorage();
 
-      if (supabase) {
-          const { error } = await supabase.from('submissions').update({ validations: sub.validations, status: sub.status }).eq('id', submissionId);
-          if (error) {
-              console.error("Supabase Error:", error);
-              alert("Gagal mereset validasi di Supabase: " + error.message);
+      if (firebaseDb) {
+          try {
+              await updateDoc(doc(firebaseDb, 'submissions', submissionId), { validations: sub.validations, status: sub.status });
+          } catch (error: any) {
+              console.warn("Firebase Error:");
+              // alert("Gagal mereset validasi di Firebase: " + error.message);
           }
       }
     }
@@ -361,8 +354,8 @@ class MockDatabase {
           else if (sub.status === 'revision_skripsi_pending') sub.status = 'skripsi_completed';
           this.saveToStorage();
 
-          if (supabase) {
-              await supabase.from('submissions').update({ status: sub.status }).eq('id', submissionId);
+          if (firebaseDb) {
+              await updateDoc(doc(firebaseDb, 'submissions', submissionId), { status: sub.status });
           }
       }
   }
@@ -370,13 +363,13 @@ class MockDatabase {
   // 4. SCHEDULES
   async getSchedules(): Promise<Schedule[]> {
       let rawSchedules = [...this.schedules];
-      if (supabase) {
-          const { data, error } = await supabase.from('schedules').select('*');
-          if (error) {
-              console.error("Supabase fetch schedules error:", error);
-          } else if (data) {
-              this.schedules = data as Schedule[];
+      if (firebaseDb) {
+          try {
+              const snapshot = await getDocs(collection(firebaseDb, 'schedules'));
+              this.schedules = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Schedule[];
               rawSchedules = this.schedules;
+          } catch (error) {
+              console.warn("Firebase fetch schedules error:");
           }
       }
       
@@ -466,17 +459,21 @@ class MockDatabase {
       if (sub) sub.status = 'scheduled';
       this.saveToStorage();
 
-      if (supabase) {
+      if (firebaseDb) {
           const cleanSchedule = { ...schedule } as any;
           delete cleanSchedule.academicYear;
 
-          const { error: schedError } = await supabase.from('schedules').insert(cleanSchedule);
-          if (schedError) {
-              console.error("Supabase Insert Schedule Error:", schedError);
-              alert("Gagal menyimpan jadwal ke Supabase: " + schedError.message);
+          try {
+              await setDoc(doc(firebaseDb, 'schedules', cleanSchedule.id), cleanSchedule);
+          } catch (schedError: any) {
+              console.warn("Firebase Insert Schedule Error:");
+              // alert("Gagal menyimpan jadwal ke Firebase: " + schedError.message);
           }
-          const { error: subError } = await supabase.from('submissions').update({ status: 'scheduled' }).eq('id', schedule.submissionId);
-          if (subError) console.error("Supabase Update Submission Error:", subError);
+          try {
+              await updateDoc(doc(firebaseDb, 'submissions', schedule.submissionId), { status: 'scheduled' });
+          } catch (subError) {
+              console.warn("Firebase Update Submission Error:");
+          }
       }
   }
 
@@ -487,14 +484,15 @@ class MockDatabase {
       Object.assign(schedule, updates);
       this.saveToStorage();
 
-      if (supabase) {
+      if (firebaseDb) {
           const cleanUpdates = { ...updates } as any;
           delete cleanUpdates.academicYear;
 
-          const { error } = await supabase.from('schedules').update(cleanUpdates).eq('id', scheduleId);
-          if (error) {
-              console.error("Supabase Update Schedule Error:", error);
-              alert("Gagal mengupdate jadwal ke Supabase: " + error.message);
+          try {
+              await updateDoc(doc(firebaseDb, 'schedules', scheduleId), cleanUpdates);
+          } catch (error: any) {
+              console.warn("Firebase Update Schedule Error:");
+              // alert("Gagal mengupdate jadwal ke Firebase: " + error.message);
           }
       }
   }
@@ -510,9 +508,9 @@ class MockDatabase {
     }
     this.saveToStorage();
 
-    if (supabase) {
-        await supabase.from('schedules').update({ status: 'completed' }).eq('id', scheduleId);
-        if (sub) await supabase.from('submissions').update({ status: sub.status }).eq('id', sub.id);
+    if (firebaseDb) {
+        await updateDoc(doc(firebaseDb, 'schedules', scheduleId), { status: 'completed' });
+        if (sub) await updateDoc(doc(firebaseDb, 'submissions', sub.id), { status: sub.status });
     }
   }
 
@@ -534,9 +532,9 @@ class MockDatabase {
     }
     this.saveToStorage();
 
-    if (supabase) {
-        await supabase.from('schedules').delete().eq('id', scheduleId);
-        if (sub) await supabase.from('submissions').update({ status: 'rejected', validations: sub.validations }).eq('id', sub.id);
+    if (firebaseDb) {
+        await deleteDoc(doc(firebaseDb, 'schedules', scheduleId));
+        if (sub) await updateDoc(doc(firebaseDb, 'submissions', sub.id), { status: 'rejected', validations: sub.validations });
     }
   }
 

@@ -1,5 +1,6 @@
 
-import { supabase } from './supabase';
+import { db } from './firebase';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { Student } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -231,13 +232,18 @@ const saveStudentsToStorage = (students: Student[]) => {
 };
 
 export const getAllStudents = async (): Promise<Student[]> => {
-    // 1. Try Supabase
-    if (supabase) {
-        const { data, error } = await supabase.from('students').select('*');
-        if (!error && data && data.length > 0) {
-            cachedStudents = data as Student[];
-            saveStudentsToStorage(cachedStudents);
-            return cachedStudents;
+    // 1. Try Firebase
+    if (db) {
+        try {
+            const snapshot = await getDocs(collection(db, 'students'));
+            const data = snapshot.docs.map(d => ({ ...d.data() })) as Student[];
+            if (data && data.length > 0) {
+                cachedStudents = data;
+                saveStudentsToStorage(cachedStudents);
+                return cachedStudents;
+            }
+        } catch (error) {
+            console.warn("Firebase fetch students warning:");
         }
     }
 
@@ -270,8 +276,12 @@ export const addStudent = async (student: Student): Promise<{ success: boolean; 
     all.push(student);
     saveStudentsToStorage(all);
 
-    if (supabase) {
-        await supabase.from('students').insert(student);
+    if (db) {
+        try {
+            await setDoc(doc(db, 'students', student.npm), student);
+        } catch (error) {
+            console.warn("Firebase addStudent warning:");
+        }
     }
     return { success: true, message: 'Berhasil menambah data mahasiswa.' };
 };
@@ -283,8 +293,12 @@ export const updateStudent = async (npm: string, data: Student): Promise<void> =
         all[index] = { ...all[index], ...data };
         saveStudentsToStorage(all);
 
-        if (supabase) {
-            await supabase.from('students').update(data).eq('npm', npm);
+        if (db) {
+            try {
+                await updateDoc(doc(db, 'students', npm), data as any);
+            } catch (error) {
+                console.warn("Firebase updateStudent warning:");
+            }
         }
     }
 };
@@ -294,8 +308,14 @@ export const deleteStudents = async (npms: string[]): Promise<void> => {
     const filtered = all.filter(s => !npms.includes(s.npm));
     saveStudentsToStorage(filtered);
 
-    if (supabase) {
-        await supabase.from('students').delete().in('npm', npms);
+    if (db) {
+        try {
+            const batch = writeBatch(db);
+            npms.forEach(npm => batch.delete(doc(db, 'students', npm)));
+            await batch.commit();
+        } catch (error) {
+            console.warn("Firebase deleteStudents warning:");
+        }
     }
 };
 
@@ -306,8 +326,14 @@ export const restoreStudents = async (students: Student[]): Promise<void> => {
     const merged = [...all, ...toAdd];
     saveStudentsToStorage(merged);
 
-    if (supabase && toAdd.length > 0) {
-        await supabase.from('students').insert(toAdd);
+    if (db && toAdd.length > 0) {
+        try {
+            const batch = writeBatch(db);
+            toAdd.forEach(s => batch.set(doc(db, 'students', s.npm), s));
+            await batch.commit();
+        } catch (error) {
+            console.warn("Firebase restoreStudents warning:");
+        }
     }
 };
 
@@ -394,7 +420,18 @@ export const importStudents = async (newStudents: Student[]): Promise<{ added: n
     });
 
     saveStudentsToStorage(all);
-    if (supabase) await supabase.from('students').upsert(all);
+    if (db) {
+        try {
+            for (let i = 0; i < all.length; i += 499) {
+                const chunk = all.slice(i, i + 499);
+                const batch = writeBatch(db);
+                chunk.forEach(s => batch.set(doc(db, 'students', s.npm), s));
+                await batch.commit();
+            }
+        } catch (error) {
+            console.warn("Firebase importStudents warning:");
+        }
+    }
 
     return { added, updated };
 };
