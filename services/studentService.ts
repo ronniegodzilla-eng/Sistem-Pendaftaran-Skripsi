@@ -234,12 +234,16 @@ const saveStudentsToStorage = (students: Student[]) => {
 export const getAllStudents = async (): Promise<Student[]> => {
     // 1. Try Firebase
     if (db) {
-        const snapshot = await getDocs(collection(db, 'students'));
-        const data = snapshot.docs.map(d => ({ ...d.data() })) as Student[];
-        if (data && data.length > 0) {
-            cachedStudents = data;
-            saveStudentsToStorage(cachedStudents);
-            return cachedStudents;
+        try {
+            const snapshot = await getDocs(collection(db, 'students'));
+            const data = snapshot.docs.map(d => ({ ...d.data() })) as Student[];
+            if (data && data.length > 0) {
+                cachedStudents = data;
+                saveStudentsToStorage(cachedStudents);
+                return cachedStudents;
+            }
+        } catch (error) {
+            console.warn("Firebase fetch students warning:");
         }
     }
 
@@ -273,7 +277,11 @@ export const addStudent = async (student: Student): Promise<{ success: boolean; 
     saveStudentsToStorage(all);
 
     if (db) {
-        await setDoc(doc(db, 'students', student.npm), student);
+        try {
+            await setDoc(doc(db, 'students', student.npm), student);
+        } catch (error) {
+            console.warn("Firebase addStudent warning:");
+        }
     }
     return { success: true, message: 'Berhasil menambah data mahasiswa.' };
 };
@@ -286,7 +294,11 @@ export const updateStudent = async (npm: string, data: Student): Promise<void> =
         saveStudentsToStorage(all);
 
         if (db) {
-            await updateDoc(doc(db, 'students', npm), data as any);
+            try {
+                await updateDoc(doc(db, 'students', npm), data as any);
+            } catch (error) {
+                console.warn("Firebase updateStudent warning:");
+            }
         }
     }
 };
@@ -297,9 +309,13 @@ export const deleteStudents = async (npms: string[]): Promise<void> => {
     saveStudentsToStorage(filtered);
 
     if (db) {
-        const batch = writeBatch(db);
-        npms.forEach(npm => batch.delete(doc(db, 'students', npm)));
-        await batch.commit();
+        try {
+            const batch = writeBatch(db);
+            npms.forEach(npm => batch.delete(doc(db, 'students', npm)));
+            await batch.commit();
+        } catch (error) {
+            console.warn("Firebase deleteStudents warning:");
+        }
     }
 };
 
@@ -311,9 +327,13 @@ export const restoreStudents = async (students: Student[]): Promise<void> => {
     saveStudentsToStorage(merged);
 
     if (db && toAdd.length > 0) {
-        const batch = writeBatch(db);
-        toAdd.forEach(s => batch.set(doc(db, 'students', s.npm), s));
-        await batch.commit();
+        try {
+            const batch = writeBatch(db);
+            toAdd.forEach(s => batch.set(doc(db, 'students', s.npm), s));
+            await batch.commit();
+        } catch (error) {
+            console.warn("Firebase restoreStudents warning:");
+        }
     }
 };
 
@@ -401,11 +421,15 @@ export const importStudents = async (newStudents: Student[]): Promise<{ added: n
 
     saveStudentsToStorage(all);
     if (db) {
-        for (let i = 0; i < all.length; i += 499) {
-            const chunk = all.slice(i, i + 499);
-            const batch = writeBatch(db);
-            chunk.forEach(s => batch.set(doc(db, 'students', s.npm), s));
-            await batch.commit();
+        try {
+            for (let i = 0; i < all.length; i += 499) {
+                const chunk = all.slice(i, i + 499);
+                const batch = writeBatch(db);
+                chunk.forEach(s => batch.set(doc(db, 'students', s.npm), s));
+                await batch.commit();
+            }
+        } catch (error) {
+            console.warn("Firebase importStudents warning:");
         }
     }
 

@@ -205,7 +205,7 @@ class MockDatabase {
               this.submissions = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Submission[];
               return this.submissions;
           } catch (error) {
-              console.error("Firebase fetch error:", error);
+              console.warn("Firebase fetch error:");
           }
       }
       
@@ -254,8 +254,8 @@ class MockDatabase {
           try {
               await setDoc(doc(firebaseDb, 'submissions', cleanSubmission.id), cleanSubmission);
           } catch (error: any) {
-              console.error("Firebase Error:", error);
-              alert("Gagal menyimpan ke Firebase: " + error.message);
+              console.warn("Firebase Error:");
+              // alert("Gagal menyimpan ke Firebase: " + error.message);
           }
       }
   }
@@ -282,8 +282,8 @@ class MockDatabase {
              try {
                  await updateDoc(doc(firebaseDb, 'submissions', submissionId), { files: cleanFiles, validations: {} });
              } catch (error: any) {
-                 console.error("Firebase Error:", error);
-                 alert("Gagal menyimpan revisi ke Firebase: " + error.message);
+                 console.warn("Firebase Error:");
+                 // alert("Gagal menyimpan revisi ke Firebase: " + error.message);
              }
         }
       }
@@ -318,8 +318,8 @@ class MockDatabase {
           try {
               await updateDoc(doc(firebaseDb, 'submissions', submissionId), { validations: sub.validations, status: sub.status });
           } catch (error: any) {
-              console.error("Firebase Error:", error);
-              alert("Gagal memvalidasi di Firebase: " + error.message);
+              console.warn("Firebase Error:");
+              // alert("Gagal memvalidasi di Firebase: " + error.message);
           }
       }
     }
@@ -340,8 +340,8 @@ class MockDatabase {
           try {
               await updateDoc(doc(firebaseDb, 'submissions', submissionId), { validations: sub.validations, status: sub.status });
           } catch (error: any) {
-              console.error("Firebase Error:", error);
-              alert("Gagal mereset validasi di Firebase: " + error.message);
+              console.warn("Firebase Error:");
+              // alert("Gagal mereset validasi di Firebase: " + error.message);
           }
       }
     }
@@ -369,7 +369,7 @@ class MockDatabase {
               this.schedules = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Schedule[];
               rawSchedules = this.schedules;
           } catch (error) {
-              console.error("Firebase fetch schedules error:", error);
+              console.warn("Firebase fetch schedules error:");
           }
       }
       
@@ -466,13 +466,13 @@ class MockDatabase {
           try {
               await setDoc(doc(firebaseDb, 'schedules', cleanSchedule.id), cleanSchedule);
           } catch (schedError: any) {
-              console.error("Firebase Insert Schedule Error:", schedError);
-              alert("Gagal menyimpan jadwal ke Firebase: " + schedError.message);
+              console.warn("Firebase Insert Schedule Error:");
+              // alert("Gagal menyimpan jadwal ke Firebase: " + schedError.message);
           }
           try {
               await updateDoc(doc(firebaseDb, 'submissions', schedule.submissionId), { status: 'scheduled' });
           } catch (subError) {
-              console.error("Firebase Update Submission Error:", subError);
+              console.warn("Firebase Update Submission Error:");
           }
       }
   }
@@ -491,8 +491,8 @@ class MockDatabase {
           try {
               await updateDoc(doc(firebaseDb, 'schedules', scheduleId), cleanUpdates);
           } catch (error: any) {
-              console.error("Firebase Update Schedule Error:", error);
-              alert("Gagal mengupdate jadwal ke Firebase: " + error.message);
+              console.warn("Firebase Update Schedule Error:");
+              // alert("Gagal mengupdate jadwal ke Firebase: " + error.message);
           }
       }
   }
