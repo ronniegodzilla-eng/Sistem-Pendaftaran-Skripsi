@@ -7,7 +7,10 @@ import { format } from 'path';
 
 // Helper to format date
 const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString('id-ID', {
+    if (!date) return '-';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleDateString('id-ID', {
         day: 'numeric', month: 'long', year: 'numeric'
     });
 };
