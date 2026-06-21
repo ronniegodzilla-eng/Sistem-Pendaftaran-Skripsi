@@ -12,6 +12,7 @@ export type PageView =
   | 'admin-scheduling' 
   | 'admin-settings'
   | 'admin-reports' // New Report Page
+  | 'admin-progress' // Tracking Progress
   | 'library-admin'; 
 
 export interface FileRequirement {

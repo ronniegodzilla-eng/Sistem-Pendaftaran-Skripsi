@@ -10,6 +10,7 @@ import { AdminValidation } from './pages/AdminValidation';
 import { AdminScheduling } from './pages/AdminScheduling';
 import { AdminSettings } from './pages/AdminSettings';
 import { AdminReports } from './pages/AdminReports'; 
+import { AdminProgress } from './pages/AdminProgress';
 import { LibraryAdmin } from './pages/LibraryAdmin';
 import { Assistant } from './components/Assistant';
 import { PageView } from './types';
@@ -120,6 +121,8 @@ const App: React.FC = () => {
         return <AdminSettings onDataChange={handleGlobalUpdate} />;
       case 'admin-reports':
         return <AdminReports />;
+      case 'admin-progress':
+        return <AdminProgress />;
       case 'library-admin':
         return <LibraryAdmin />;
       default:
