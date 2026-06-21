@@ -130,6 +130,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 <>
                   <NavItem page="admin-validation" icon={CheckSquare} label="Validasi" />
                   <NavItem page="admin-scheduling" icon={Calendar} label="Jadwal & Sidang" />
+                  <NavItem page="admin-progress" icon={BarChart3} label="Progres" />
                   <NavItem page="admin-reports" icon={ClipboardList} label="Laporan" />
                   <NavItem page="admin-settings" icon={Settings} label="Pengaturan" />
                 </>
@@ -193,6 +194,7 @@ export const Layout: React.FC<LayoutProps> = ({
                 <>
                   <NavItem page="admin-validation" icon={CheckSquare} label="Validasi Berkas" />
                   <NavItem page="admin-scheduling" icon={Calendar} label="Penjadwalan" />
+                  <NavItem page="admin-progress" icon={BarChart3} label="Progres" />
                   <NavItem page="admin-reports" icon={ClipboardList} label="Laporan" />
                   <NavItem page="admin-settings" icon={Settings} label="Pengaturan" />
                 </>
