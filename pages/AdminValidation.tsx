@@ -43,7 +43,11 @@ export const AdminValidation: React.FC = () => {
           s.status === 'pending' || 
           s.status === 'rejected' || 
           s.status === 'validated'
-      ).sort((a,b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()));
+      ).sort((a,b) => {
+          const tA = new Date(a.submittedAt || 0).getTime();
+          const tB = new Date(b.submittedAt || 0).getTime();
+          return (isNaN(tB) ? 0 : tB) - (isNaN(tA) ? 0 : tA);
+      }));
 
       // Pre-fetch normal requirements for all submission types
       const propNormalReqs = await db.getRequirements('proposal');
@@ -84,8 +88,10 @@ export const AdminValidation: React.FC = () => {
       return requirements[sub.type] || [];
   };
 
-  const formatDateGMT7 = (dateString: string | Date) => {
+  const formatDateGMT7 = (dateString: string | Date | undefined) => {
+      if (!dateString) return '-';
       const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '-';
       // Format to GMT+7 (WIB)
       return new Intl.DateTimeFormat('id-ID', {
           timeZone: 'Asia/Jakarta',

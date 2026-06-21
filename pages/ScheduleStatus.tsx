@@ -336,7 +336,13 @@ export const ScheduleStatus: React.FC = () => {
                                       </td>
                                       <td className="px-6 py-4 text-sm text-slate-600">{item.prodi}</td>
                                       <td className="px-6 py-4 text-xs font-bold uppercase">{item.type}</td>
-                                      <td className="px-6 py-4 text-sm">{new Date(item.submittedAt).toLocaleDateString()}</td>
+                                      <td className="px-6 py-4 text-sm">
+                                        {item.submittedAt ? (
+                                            isNaN(new Date(item.submittedAt).getTime()) 
+                                                ? '-' 
+                                                : new Date(item.submittedAt).toLocaleDateString()
+                                        ) : '-'}
+                                      </td>
                                       <td className="px-6 py-4">{getStatusLabel(item)}</td>
                                   </tr>
                              ))}

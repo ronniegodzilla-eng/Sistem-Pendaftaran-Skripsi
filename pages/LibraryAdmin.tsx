@@ -31,7 +31,9 @@ export const LibraryAdmin: React.FC = () => {
         const isBPending = b.status.includes('pending');
         if (isAPending && !isBPending) return -1;
         if (!isAPending && isBPending) return 1;
-        return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+        const tA = new Date(a.submittedAt || 0).getTime();
+        const tB = new Date(b.submittedAt || 0).getTime();
+        return (isNaN(tB) ? 0 : tB) - (isNaN(tA) ? 0 : tA);
     });
 
     setPendingRevisions(relevant);
