@@ -230,7 +230,14 @@ class MockDatabase {
       if (firebaseDb) {
           try {
               const snapshot = await getDocs(collection(firebaseDb, 'submissions'));
-              this.submissions = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Submission[];
+              this.submissions = snapshot.docs.map(d => {
+                  const data = d.data();
+                  // Convert Firestore Timestamp to Date object/ISO string if needed
+                  if (data.submittedAt && typeof data.submittedAt.toDate === 'function') {
+                      data.submittedAt = data.submittedAt.toDate().toISOString();
+                  }
+                  return { id: d.id, ...data };
+              }) as Submission[];
               return this.submissions;
           } catch (error) {
               console.warn("Firebase fetch error:");
