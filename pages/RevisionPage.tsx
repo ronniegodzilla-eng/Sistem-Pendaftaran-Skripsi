@@ -142,7 +142,7 @@ export const RevisionPage: React.FC<RevisionPageProps> = ({
     });
   };
 
-  const isComplete = requirements.every(r => !!files[r.id]);
+  const isComplete = requirements.length > 0 && requirements.filter(r => r.required !== false).every(r => !!files[r.id]);
   const isAnyUploading = Object.values(uploadingStatus).some(status => status);
 
   const handleSubmit = async (e: React.FormEvent) => {

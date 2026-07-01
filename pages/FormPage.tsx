@@ -161,7 +161,7 @@ export const FormPage: React.FC<FormPageProps> = ({
     (Object.keys(files).length / requirements.filter(r => r.required).length) * 100
   );
 
-  const isComplete = requirements.filter(r => r.required).every(r => !!files[r.id]);
+  const isComplete = requirements.length > 0 && requirements.filter(r => r.required).every(r => !!files[r.id]);
   const isAnyUploading = Object.values(uploadingStatus).some(status => status);
 
   const handleSubmit = async (e: React.FormEvent) => {
