@@ -125,11 +125,15 @@ class MockDatabase {
   // --- Requirements Management (Sync for UI speed) ---
   async getRequirements(type: 'proposal' | 'skripsi'): Promise<FileRequirement[]> {
       if (firebaseDb) {
-          const docSnap = await getDoc(doc(firebaseDb, 'settings', `req_${type}`));
-          if (docSnap.exists() && docSnap.data().value) {
-              const value = docSnap.data().value;
-              if (type === 'proposal') this.proposalRequirements = value;
-              else this.skripsiRequirements = value;
+          try {
+              const docSnap = await getDoc(doc(firebaseDb, 'settings', `req_${type}`));
+              if (docSnap.exists() && docSnap.data().value) {
+                  const value = docSnap.data().value;
+                  if (type === 'proposal') this.proposalRequirements = value;
+                  else this.skripsiRequirements = value;
+              }
+          } catch (e) {
+              console.warn("Firebase getRequirements error:", e);
           }
       }
       return type === 'proposal' ? this.proposalRequirements : this.skripsiRequirements;
@@ -140,17 +144,25 @@ class MockDatabase {
       else this.skripsiRequirements = newReqs;
       
       if (firebaseDb) {
-          await setDoc(doc(firebaseDb, 'settings', `req_${type}`), { value: newReqs });
+          try {
+              await setDoc(doc(firebaseDb, 'settings', `req_${type}`), { value: newReqs });
+          } catch (e) {
+              console.warn("Firebase updateRequirements error:", e);
+          }
       }
   }
 
   async getRevisionRequirements(type: 'proposal' | 'skripsi'): Promise<FileRequirement[]> {
       if (firebaseDb) {
-          const docSnap = await getDoc(doc(firebaseDb, 'settings', `revision_req_${type}`));
-          if (docSnap.exists() && docSnap.data().value) {
-              const value = docSnap.data().value;
-              if (type === 'proposal') this.proposalRevisionRequirements = value;
-              else this.skripsiRevisionRequirements = value;
+          try {
+              const docSnap = await getDoc(doc(firebaseDb, 'settings', `revision_req_${type}`));
+              if (docSnap.exists() && docSnap.data().value) {
+                  const value = docSnap.data().value;
+                  if (type === 'proposal') this.proposalRevisionRequirements = value;
+                  else this.skripsiRevisionRequirements = value;
+              }
+          } catch (e) {
+              console.warn("Firebase getRevisionRequirements error:", e);
           }
       }
       return type === 'proposal' ? this.proposalRevisionRequirements : this.skripsiRevisionRequirements;
@@ -161,15 +173,23 @@ class MockDatabase {
       else this.skripsiRevisionRequirements = newReqs;
       
       if (firebaseDb) {
-          await setDoc(doc(firebaseDb, 'settings', `revision_req_${type}`), { value: newReqs });
+          try {
+              await setDoc(doc(firebaseDb, 'settings', `revision_req_${type}`), { value: newReqs });
+          } catch (e) {
+              console.warn("Firebase updateRevisionRequirements error:", e);
+          }
       }
   }
 
   async getRooms(): Promise<string[]> {
       if (firebaseDb) {
-          const snapshot = await getDocs(collection(firebaseDb, 'rooms'));
-          this.rooms = snapshot.docs.map(d => d.id);
-          return this.rooms;
+          try {
+              const snapshot = await getDocs(collection(firebaseDb, 'rooms'));
+              this.rooms = snapshot.docs.map(d => d.id);
+              return this.rooms;
+          } catch (e) {
+              console.warn("Firebase getRooms error:", e);
+          }
       }
       return new Promise(resolve => setTimeout(() => resolve([...this.rooms]), 300));
   }
@@ -180,7 +200,11 @@ class MockDatabase {
           this.saveToStorage();
           
           if (firebaseDb) {
-              await setDoc(doc(firebaseDb, 'rooms', roomName), { name: roomName });
+              try {
+                  await setDoc(doc(firebaseDb, 'rooms', roomName), { name: roomName });
+              } catch (e) {
+                  console.warn("Firebase addRoom error:", e);
+              }
           }
       }
   }
@@ -190,7 +214,11 @@ class MockDatabase {
       this.saveToStorage();
       
       if (firebaseDb) {
-          await deleteDoc(doc(firebaseDb, 'rooms', roomName));
+          try {
+              await deleteDoc(doc(firebaseDb, 'rooms', roomName));
+          } catch (e) {
+              console.warn("Firebase deleteRoom error:", e);
+          }
       }
   }
 
