@@ -61,11 +61,37 @@ const App: React.FC = () => {
          setHasNotifications(showDot);
      };
 
-     checkNotifications();
-     const interval = setInterval(checkNotifications, 60000);
-     return () => clearInterval(interval);
+     // This used to poll every 60 seconds for as long as the tab existed, re-reading
+     // whole Firestore collections around the clock even with nobody using the app.
+     // It now refreshes on a slow interval and only while the tab is actually
+     // visible, so a forgotten background tab costs nothing. Navigating between
+     // pages still re-runs this effect, and the read cache keeps that near-free.
+     const REFRESH_MS = 15 * 60 * 1000;
+     const MIN_GAP_MS = 5 * 60 * 1000;
+     let lastCheckedAt = 0;
 
-  }, [currentPage, adminRole, dataVersion]); 
+     const runCheck = () => {
+         lastCheckedAt = Date.now();
+         checkNotifications();
+     };
+
+     const refreshIfVisible = () => {
+         if (document.visibilityState !== 'visible') return;
+         if (Date.now() - lastCheckedAt < MIN_GAP_MS) return;
+         runCheck();
+     };
+
+     runCheck();
+     const interval = setInterval(refreshIfVisible, REFRESH_MS);
+     // Bring the badge up to date the moment the user comes back to the tab.
+     document.addEventListener('visibilitychange', refreshIfVisible);
+
+     return () => {
+         clearInterval(interval);
+         document.removeEventListener('visibilitychange', refreshIfVisible);
+     };
+
+  }, [currentPage, adminRole, dataVersion]);
 
   const handleGlobalUpdate = () => {
       setDataVersion(prev => prev + 1);

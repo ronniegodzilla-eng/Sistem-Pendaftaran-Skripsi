@@ -1,0 +1,18 @@
+node_modules/
+dist/
+dist-ssr/
+
+# Local environment files. NOTE: .env is already tracked in this repository from
+# earlier commits, so this rule does not remove it - see README/PR notes for how
+# to untrack it safely once the hosting provider has the variables configured.
+.env
+.env.*
+!.env.example
+
+*.local
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log
+npm-debug.log*
