@@ -3,6 +3,7 @@ import { Submission, Schedule, FileRequirement } from '../types';
 import { PROPOSAL_REQUIREMENTS, SKRIPSI_REQUIREMENTS, PROPOSAL_REVISION_REQUIREMENTS, SKRIPSI_REVISION_REQUIREMENTS } from '../constants';
 import { db as firebaseDb } from './firebase';
 import { collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { getCached, invalidateCache, settingsKey, CACHE_KEYS, CACHE_TTL } from './cache';
 import { getAllStudents } from './studentService';
 
 // This simulates a backend database with Persistence
@@ -73,6 +74,9 @@ class MockDatabase {
           localStorage.setItem(this.STORAGE_KEY_SCHEDULES, JSON.stringify(this.schedules));
           localStorage.setItem(this.STORAGE_KEY_ROOMS, JSON.stringify(this.rooms));
       }
+      // Every mutation in this class routes through here, so invalidating the read
+      // cache in one place guarantees no write path can leave it stale.
+      invalidateCache(CACHE_KEYS.submissions, CACHE_KEYS.schedules, CACHE_KEYS.rooms);
   }
 
   // --- UNDO / SNAPSHOT FEATURES ---
@@ -126,9 +130,15 @@ class MockDatabase {
   async getRequirements(type: 'proposal' | 'skripsi'): Promise<FileRequirement[]> {
       if (firebaseDb) {
           try {
-              const docSnap = await getDoc(doc(firebaseDb, 'settings', `req_${type}`));
-              if (docSnap.exists() && docSnap.data().value) {
-                  const value = docSnap.data().value;
+              const value = await getCached(
+                  settingsKey(`req_${type}`),
+                  async () => {
+                      const docSnap = await getDoc(doc(firebaseDb, 'settings', `req_${type}`));
+                      return docSnap.exists() ? docSnap.data().value : null;
+                  },
+                  CACHE_TTL.stable
+              );
+              if (value) {
                   if (type === 'proposal') this.proposalRequirements = value;
                   else this.skripsiRequirements = value;
               }
@@ -143,6 +153,8 @@ class MockDatabase {
       if (type === 'proposal') this.proposalRequirements = newReqs;
       else this.skripsiRequirements = newReqs;
       
+      invalidateCache(settingsKey(`req_${type}`));
+
       if (firebaseDb) {
           try {
               await setDoc(doc(firebaseDb, 'settings', `req_${type}`), { value: newReqs });
@@ -155,9 +167,15 @@ class MockDatabase {
   async getRevisionRequirements(type: 'proposal' | 'skripsi'): Promise<FileRequirement[]> {
       if (firebaseDb) {
           try {
-              const docSnap = await getDoc(doc(firebaseDb, 'settings', `revision_req_${type}`));
-              if (docSnap.exists() && docSnap.data().value) {
-                  const value = docSnap.data().value;
+              const value = await getCached(
+                  settingsKey(`revision_req_${type}`),
+                  async () => {
+                      const docSnap = await getDoc(doc(firebaseDb, 'settings', `revision_req_${type}`));
+                      return docSnap.exists() ? docSnap.data().value : null;
+                  },
+                  CACHE_TTL.stable
+              );
+              if (value) {
                   if (type === 'proposal') this.proposalRevisionRequirements = value;
                   else this.skripsiRevisionRequirements = value;
               }
@@ -172,6 +190,8 @@ class MockDatabase {
       if (type === 'proposal') this.proposalRevisionRequirements = newReqs;
       else this.skripsiRevisionRequirements = newReqs;
       
+      invalidateCache(settingsKey(`revision_req_${type}`));
+
       if (firebaseDb) {
           try {
               await setDoc(doc(firebaseDb, 'settings', `revision_req_${type}`), { value: newReqs });
@@ -184,8 +204,14 @@ class MockDatabase {
   async getRooms(): Promise<string[]> {
       if (firebaseDb) {
           try {
-              const snapshot = await getDocs(collection(firebaseDb, 'rooms'));
-              this.rooms = snapshot.docs.map(d => d.id);
+              this.rooms = await getCached(
+                  CACHE_KEYS.rooms,
+                  async () => {
+                      const snapshot = await getDocs(collection(firebaseDb, 'rooms'));
+                      return snapshot.docs.map(d => d.id);
+                  },
+                  CACHE_TTL.stable
+              );
               return this.rooms;
           } catch (e) {
               console.warn("Firebase getRooms error:", e);
@@ -198,7 +224,7 @@ class MockDatabase {
       if (!this.rooms.includes(roomName)) {
           this.rooms.push(roomName);
           this.saveToStorage();
-          
+
           if (firebaseDb) {
               try {
                   await setDoc(doc(firebaseDb, 'rooms', roomName), { name: roomName });
@@ -212,7 +238,7 @@ class MockDatabase {
   async deleteRoom(roomName: string): Promise<void> {
       this.rooms = this.rooms.filter(r => r !== roomName);
       this.saveToStorage();
-      
+
       if (firebaseDb) {
           try {
               await deleteDoc(doc(firebaseDb, 'rooms', roomName));
@@ -225,19 +251,27 @@ class MockDatabase {
   // --- ASYNC DATA OPERATIONS ---
 
   // 1. GET SUBMISSIONS
-  async getSubmissions(): Promise<Submission[]> {
+  // `forceFresh` bypasses the cache where reading stale data would be incorrect.
+  async getSubmissions(forceFresh: boolean = false): Promise<Submission[]> {
       // 1. Try Firebase if connected
       if (firebaseDb) {
           try {
-              const snapshot = await getDocs(collection(firebaseDb, 'submissions'));
-              this.submissions = snapshot.docs.map(d => {
-                  const data = d.data();
-                  // Convert Firestore Timestamp to Date object/ISO string if needed
-                  if (data.submittedAt && typeof data.submittedAt.toDate === 'function') {
-                      data.submittedAt = data.submittedAt.toDate().toISOString();
-                  }
-                  return { id: d.id, ...data };
-              }) as Submission[];
+              this.submissions = await getCached(
+                  CACHE_KEYS.submissions,
+                  async () => {
+                      const snapshot = await getDocs(collection(firebaseDb, 'submissions'));
+                      return snapshot.docs.map(d => {
+                          const data = d.data();
+                          // Convert Firestore Timestamp to Date object/ISO string if needed
+                          if (data.submittedAt && typeof data.submittedAt.toDate === 'function') {
+                              data.submittedAt = data.submittedAt.toDate().toISOString();
+                          }
+                          return { id: d.id, ...data };
+                      }) as Submission[];
+                  },
+                  CACHE_TTL.volatile,
+                  forceFresh
+              );
               return this.submissions;
           } catch (error) {
               console.warn("Firebase fetch error:");
@@ -327,8 +361,8 @@ class MockDatabase {
   // 3. VALIDATION
   async validateFile(submissionId: string, fileId: string, isValid: boolean, notes: string = ''): Promise<void> {
     // Pastikan data terbaru dari Supabase sudah ada di local cache
-    await this.getSubmissions();
-    
+    await this.getSubmissions(true);
+
     const sub = this.submissions.find(s => s.id === submissionId);
     if (sub) {
       if (!sub.validations) sub.validations = {};
@@ -361,7 +395,7 @@ class MockDatabase {
   }
 
   async resetFileValidation(submissionId: string, fileId: string): Promise<void> {
-    await this.getSubmissions();
+    await this.getSubmissions(true);
     const sub = this.submissions.find(s => s.id === submissionId);
     if (sub) {
       if (!sub.validations) sub.validations = {};
@@ -396,20 +430,29 @@ class MockDatabase {
   }
 
   // 4. SCHEDULES
-  async getSchedules(): Promise<Schedule[]> {
+  async getSchedules(forceFresh: boolean = false): Promise<Schedule[]> {
       let rawSchedules = [...this.schedules];
       if (firebaseDb) {
           try {
-              const snapshot = await getDocs(collection(firebaseDb, 'schedules'));
-              this.schedules = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Schedule[];
+              this.schedules = await getCached(
+                  CACHE_KEYS.schedules,
+                  async () => {
+                      const snapshot = await getDocs(collection(firebaseDb, 'schedules'));
+                      return snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as Schedule[];
+                  },
+                  CACHE_TTL.volatile,
+                  forceFresh
+              );
               rawSchedules = this.schedules;
           } catch (error) {
               console.warn("Firebase fetch schedules error:");
           }
       }
-      
+
+      // Both of these are cached, so patching schedules no longer re-reads the
+      // whole students and submissions collections on every call.
       const students = await getAllStudents();
-      const allSubs = await this.getSubmissions();
+      const allSubs = await this.getSubmissions(forceFresh);
       
       // Patch with the latest real-time student configuration (pembimbing and penguji)
       const patchedSchedules = rawSchedules.map(sch => {
@@ -474,8 +517,8 @@ class MockDatabase {
       return patchedSchedules;
   }
 
-  async getUpcomingSchedules(days: number = 3): Promise<Schedule[]> {
-      const all = await this.getSchedules();
+  async getUpcomingSchedules(days: number = 3, forceFresh: boolean = false): Promise<Schedule[]> {
+      const all = await this.getSchedules(forceFresh);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const futureDate = new Date(today);
@@ -580,8 +623,8 @@ class MockDatabase {
   }
 
   async checkConflict(newSchedule: Schedule): Promise<string | null> {
-    // FORCE FRESH FETCH for accuracy
-    const latestSchedules = await this.getSchedules();
+    // FORCE FRESH FETCH for accuracy - a stale read here could double-book a room.
+    const latestSchedules = await this.getSchedules(true);
 
     const newStart = this.timeToMinutes(newSchedule.time);
     const newEnd = this.timeToMinutes(newSchedule.endTime);

@@ -7,6 +7,8 @@ import { uploadFileToDrive } from '../services/driveService';
 import { searchStudentsByName } from '../services/studentService';
 import { db } from '../services/mockDb';
 
+const SEARCH_DEBOUNCE_MS = 400;
+
 interface RevisionPageProps {
   title: string;
   onBack: () => void;
@@ -23,6 +25,8 @@ export const RevisionPage: React.FC<RevisionPageProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchTimerRef = useRef<number | null>(null);
+  const searchTokenRef = useRef(0);
 
   const [student, setStudent] = useState<Student | null>(null);
   const [requirements, setRequirements] = useState<FileRequirement[]>([]);
@@ -50,7 +54,12 @@ export const RevisionPage: React.FC<RevisionPageProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSearchChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Drop a pending search if the page goes away before the debounce fires.
+  useEffect(() => () => {
+    if (searchTimerRef.current !== null) window.clearTimeout(searchTimerRef.current);
+  }, []);
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setSearchInput(value);
     setSearchError('');
@@ -59,19 +68,32 @@ export const RevisionPage: React.FC<RevisionPageProps> = ({
         setFiles({});
         setValidations({});
     }
-    if (value.length >= 3) {
-      setIsSearching(true);
+
+    if (searchTimerRef.current !== null) window.clearTimeout(searchTimerRef.current);
+
+    if (value.length < 3) {
+      // Bump the token so a search already in flight cannot fill the list back in.
+      searchTokenRef.current++;
+      setSuggestions([]);
+      setIsSearching(false);
+      return;
+    }
+
+    // Searching read the whole student collection on every keystroke. Wait for a
+    // pause in typing so one search costs one read instead of one per character.
+    setIsSearching(true);
+    const token = ++searchTokenRef.current;
+    searchTimerRef.current = window.setTimeout(async () => {
       try {
         const results = await searchStudentsByName(value);
+        if (token !== searchTokenRef.current) return; // superseded by a newer keystroke
         setSuggestions(results);
       } catch (err) {
         console.error("Search error", err);
       } finally {
-        setIsSearching(false);
+        if (token === searchTokenRef.current) setIsSearching(false);
       }
-    } else {
-      setSuggestions([]);
-    }
+    }, SEARCH_DEBOUNCE_MS);
   };
 
   const handleSelectStudent = async (selected: Student) => {

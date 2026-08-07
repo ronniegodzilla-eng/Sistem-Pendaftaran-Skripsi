@@ -1,6 +1,7 @@
 
 import { db } from './firebase';
 import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { getCached, invalidateCache, CACHE_KEYS, CACHE_TTL } from './cache';
 import { Student } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -232,11 +233,18 @@ const saveStudentsToStorage = (students: Student[]) => {
 };
 
 export const getAllStudents = async (): Promise<Student[]> => {
-    // 1. Try Firebase
+    // 1. Try Firebase. Reading the whole collection costs one Firestore read per
+    // student, so the result is cached and shared between callers.
     if (db) {
         try {
-            const snapshot = await getDocs(collection(db, 'students'));
-            const data = snapshot.docs.map(d => ({ ...d.data() })) as Student[];
+            const data = await getCached(
+                CACHE_KEYS.students,
+                async () => {
+                    const snapshot = await getDocs(collection(db, 'students'));
+                    return snapshot.docs.map(d => ({ ...d.data() })) as Student[];
+                },
+                CACHE_TTL.stable
+            );
             if (data && data.length > 0) {
                 cachedStudents = data;
                 saveStudentsToStorage(cachedStudents);
@@ -275,6 +283,7 @@ export const addStudent = async (student: Student): Promise<{ success: boolean; 
     
     all.push(student);
     saveStudentsToStorage(all);
+    invalidateCache(CACHE_KEYS.students);
 
     if (db) {
         try {
@@ -292,6 +301,7 @@ export const updateStudent = async (npm: string, data: Student): Promise<void> =
     if (index >= 0) {
         all[index] = { ...all[index], ...data };
         saveStudentsToStorage(all);
+        invalidateCache(CACHE_KEYS.students);
 
         if (db) {
             try {
@@ -307,6 +317,7 @@ export const deleteStudents = async (npms: string[]): Promise<void> => {
     const all = await getAllStudents();
     const filtered = all.filter(s => !npms.includes(s.npm));
     saveStudentsToStorage(filtered);
+    invalidateCache(CACHE_KEYS.students);
 
     if (db) {
         try {
@@ -325,6 +336,7 @@ export const restoreStudents = async (students: Student[]): Promise<void> => {
     const toAdd = students.filter(s => !all.some(exist => exist.npm === s.npm));
     const merged = [...all, ...toAdd];
     saveStudentsToStorage(merged);
+    invalidateCache(CACHE_KEYS.students);
 
     if (db && toAdd.length > 0) {
         try {
@@ -420,6 +432,7 @@ export const importStudents = async (newStudents: Student[]): Promise<{ added: n
     });
 
     saveStudentsToStorage(all);
+    invalidateCache(CACHE_KEYS.students);
     if (db) {
         try {
             for (let i = 0; i < all.length; i += 499) {
