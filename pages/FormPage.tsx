@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, CheckCircle2, Save, Loader2, Search, User, AlertCircle, X, MessageSquare } from 'lucide-react';
 import { FileUpload } from '../components/FileUpload';
-import { FileRequirement, SubmissionState, Student, ValidationItem } from '../types';
+import { FileRequirement, Submission, SubmissionState, Student, ValidationItem } from '../types';
 import { PageView } from '../types';
 import { uploadFileToDrive } from '../services/driveService';
 import { searchStudentsByName } from '../services/studentService';
-import { db } from '../services/mockDb';
+import { db, getAttemptNumber } from '../services/mockDb';
 
 const SEARCH_DEBOUNCE_MS = 400;
 
@@ -44,6 +44,8 @@ export const FormPage: React.FC<FormPageProps> = ({
   }, [pageId]);
   const [files, setFiles] = useState<SubmissionState>({});
   const [validations, setValidations] = useState<{[key: string]: ValidationItem}>({});
+  // Diisi jika mahasiswa mendaftar ulang setelah dinyatakan tidak lulus.
+  const [failedSubmission, setFailedSubmission] = useState<Submission | null>(null);
   
   const [uploadingStatus, setUploadingStatus] = useState<{[key: string]: boolean}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +74,7 @@ export const FormPage: React.FC<FormPageProps> = ({
         setStudent(null);
         setFiles({});
         setValidations({});
+        setFailedSubmission(null);
     }
 
     if (searchTimerRef.current !== null) window.clearTimeout(searchTimerRef.current);
@@ -106,6 +109,7 @@ export const FormPage: React.FC<FormPageProps> = ({
       setSearchInput(selected.nama);
       setSuggestions([]);
       setSearchError('');
+      setFailedSubmission(null);
 
       if (pageId === 'skripsi') {
           if (!selected.bypassProposal) {
@@ -121,6 +125,18 @@ export const FormPage: React.FC<FormPageProps> = ({
       const existing = await db.getSubmissionByNpm(selected.npm, pageId === 'proposal' ? 'proposal' : 'skripsi', selected.nama);
       
       if (existing) {
+        if (existing.status === 'failed') {
+            // Daftar ulang: tampilkan berkas percobaan sebelumnya, mahasiswa cukup mengganti
+            // yang perlu. Pendaftaran lama tidak diubah dan tetap tersimpan sebagai riwayat.
+            const carriedFiles: SubmissionState = {};
+            requirements.forEach(req => {
+                if (existing.files?.[req.id]) carriedFiles[req.id] = existing.files[req.id];
+            });
+            setFiles(carriedFiles);
+            setValidations({});
+            setFailedSubmission(existing);
+            return;
+        }
         if (existing.status !== 'rejected') {
             setSearchError('Pendaftaran Anda sedang berjalan atau sudah selesai. Cek Dashboard.');
             setStudent(null);
@@ -138,6 +154,7 @@ export const FormPage: React.FC<FormPageProps> = ({
       setSearchInput('');
       setFiles({});
       setValidations({});
+      setFailedSubmission(null);
       setSuggestions([]);
       setSearchError('');
   };
@@ -193,9 +210,17 @@ export const FormPage: React.FC<FormPageProps> = ({
     setIsSubmitting(true);
     
     const existing = await db.getSubmissionByNpm(student.npm, pageId === 'proposal' ? 'proposal' : 'skripsi', student.nama);
+    // Tidak lulus -> pendaftaran baru (ID baru) agar yang lama tetap jadi riwayat.
+    // Berkas ditolak -> perbaiki pendaftaran yang sama, nomor percobaannya tetap.
+    const isRetake = existing?.status === 'failed';
+    const reuseExisting = !!existing && !isRetake;
     
-    const newSubmission = {
-      id: existing ? existing.id : Date.now().toString(),
+    const newSubmission: Submission = {
+      id: reuseExisting ? existing!.id : Date.now().toString(),
+      attempt: isRetake ? getAttemptNumber(existing!) + 1 : (existing ? getAttemptNumber(existing) : 1),
+      ...(isRetake
+          ? { previousSubmissionId: existing!.id }
+          : (existing?.previousSubmissionId ? { previousSubmissionId: existing.previousSubmissionId } : {})),
       studentNpm: student.npm,
       studentName: student.nama,
       type: pageId === 'proposal' ? 'proposal' : 'skripsi' as 'proposal' | 'skripsi',
@@ -301,6 +326,15 @@ export const FormPage: React.FC<FormPageProps> = ({
       {student && !searchError && (
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6 space-y-4">
+              {failedSubmission && (
+                <div className="flex items-start gap-2 text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-lg text-sm">
+                  <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
+                  <span>
+                    <b>Pendaftaran ulang (percobaan ke-{getAttemptNumber(failedSubmission) + 1}).</b> Berkas dari pendaftaran sebelumnya sudah dimuat.
+                    Ganti hanya berkas yang perlu diperbarui, lalu kirim. Semua berkas akan divalidasi ulang oleh Admin.
+                  </span>
+                </div>
+              )}
               {requirements.map((req) => {
                   return (
                     <FileUpload
@@ -335,7 +369,7 @@ export const FormPage: React.FC<FormPageProps> = ({
                 ) : (
                   <>
                     <Save size={18} />
-                    <span>{Object.keys(validations).length > 0 ? 'Kirim Perbaikan' : 'Simpan Pendaftaran'}</span>
+                    <span>{failedSubmission ? 'Kirim Pendaftaran Ulang' : (Object.keys(validations).length > 0 ? 'Kirim Perbaikan' : 'Simpan Pendaftaran')}</span>
                   </>
                 )}
               </button>

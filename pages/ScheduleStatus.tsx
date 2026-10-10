@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { db } from '../services/mockDb';
+import { db, latestAttemptsOnly } from '../services/mockDb';
 import { Schedule, Submission } from '../types';
 import { Search, Calendar, Clock, X, AlertCircle, FileText, CheckCircle2, Loader2, ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
 
@@ -72,8 +72,13 @@ export const ScheduleStatus: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
         setLoading(true);
-        const loadedSchedules = await db.getSchedules();
-        const loadedSubmissions = await db.getSubmissions();
+        // Halaman publik: riwayat ujian ulang hanya untuk admin, jadi tampilkan percobaan
+        // terakhir saja beserta jadwalnya.
+        const allSubmissions = await db.getSubmissions();
+        const loadedSubmissions = latestAttemptsOnly(allSubmissions);
+        const latestIds = new Set(loadedSubmissions.map(s => s.id));
+        const knownIds = new Set(allSubmissions.map(s => s.id));
+        const loadedSchedules = (await db.getSchedules()).filter(sch => latestIds.has(sch.submissionId) || !knownIds.has(sch.submissionId));
         const { getAllStudents } = await import('../services/studentService');
         const students = await getAllStudents();
 
@@ -190,6 +195,8 @@ export const ScheduleStatus: React.FC = () => {
                 </button>
             );
           
+          case 'failed': return <span className="bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs font-bold">Ujian Ulang - Silakan Daftar Ulang</span>;
+
           case 'validated': return <span className="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-xs font-bold">Valid (Antrian Jadwal)</span>;
           
           default: return <span className="text-xs">{item.status}</span>;

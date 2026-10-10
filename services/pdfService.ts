@@ -1,7 +1,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { db } from './mockDb';
+import { db, pickLatestAttempt } from './mockDb';
 import { getAllStudents } from './studentService';
 import { format } from 'path';
 
@@ -201,7 +201,7 @@ export const generateStudentSubmissionReport = async (npm: string, type: 'propos
     let startY = 60;
 
     const renderSubmission = async (subType: 'proposal' | 'skripsi', isRevision: boolean, title: string) => {
-        const sub = studentSubs.find(s => s.type === subType);
+        const sub = pickLatestAttempt(studentSubs.filter(s => s.type === subType));
         if (!sub) return;
 
         // Skip if we only want revision but status doesn't include it, or vice versa

@@ -37,6 +37,33 @@ const isSimilarName = (n1: string, n2: string) => {
     return dist <= threshold;
 };
 
+// --- Ujian ulang ---
+// Mahasiswa yang tidak lulus mendaftar ulang sebagai pendaftaran BARU, sehingga satu
+// mahasiswa bisa punya beberapa pendaftaran untuk tahap yang sama. Pendaftaran yang
+// berlaku selalu percobaan terakhir; yang lebih lama hanya riwayat.
+export const getAttemptNumber = (sub: Submission) => sub.attempt ?? 1;
+
+const submittedTime = (sub: Submission) => {
+    const t = new Date(sub.submittedAt as any).getTime();
+    return isNaN(t) ? 0 : t;
+};
+
+// Urutkan dari percobaan terlama ke terbaru.
+export const sortByAttempt = (subs: Submission[]): Submission[] =>
+    [...subs].sort((a, b) => (getAttemptNumber(a) - getAttemptNumber(b)) || (submittedTime(a) - submittedTime(b)));
+
+export const pickLatestAttempt = (subs: Submission[]): Submission | undefined => {
+    const sorted = sortByAttempt(subs);
+    return sorted[sorted.length - 1];
+};
+
+// Sisakan hanya percobaan terakhir per mahasiswa per tahap.
+export const latestAttemptsOnly = (subs: Submission[]): Submission[] => {
+    const latest = new Map<string, Submission>();
+    sortByAttempt(subs).forEach(s => latest.set(`${s.studentNpm}|${s.type}`, s));
+    return subs.filter(s => latest.get(`${s.studentNpm}|${s.type}`) === s);
+};
+
 class MockDatabase {
   private submissions: Submission[] = [];
   private schedules: Schedule[] = [];
@@ -284,12 +311,18 @@ class MockDatabase {
       });
   }
 
-  async getSubmissionByNpm(npm: string, type: 'proposal' | 'skripsi', name?: string): Promise<Submission | undefined> {
+  // Semua percobaan mahasiswa untuk satu tahap, dari yang terlama.
+  async getSubmissionHistory(npm: string, type: 'proposal' | 'skripsi', name?: string): Promise<Submission[]> {
       const all = await this.getSubmissions();
-      return all.find(s => 
+      return sortByAttempt(all.filter(s => 
           (s.studentNpm === npm || (name && s.studentName.toLowerCase() === name.toLowerCase())) 
           && s.type === type
-      );
+      ));
+  }
+
+  // Percobaan terakhir (yang sedang berlaku).
+  async getSubmissionByNpm(npm: string, type: 'proposal' | 'skripsi', name?: string): Promise<Submission | undefined> {
+      return pickLatestAttempt(await this.getSubmissionHistory(npm, type, name));
   }
 
   // 2. ADD / UPDATE SUBMISSION
@@ -400,7 +433,7 @@ class MockDatabase {
     if (sub) {
       if (!sub.validations) sub.validations = {};
       delete sub.validations[fileId];
-      if (!sub.status.includes('revision') && !sub.status.includes('completed')) {
+      if (!sub.status.includes('revision') && !sub.status.includes('completed') && sub.status !== 'failed') {
           sub.status = 'pending'; 
       }
       this.saveToStorage();
@@ -580,6 +613,7 @@ class MockDatabase {
     if (!schedule) return;
 
     schedule.status = 'completed';
+    schedule.result = 'lulus';
     const sub = this.submissions.find(s => s.id === schedule.submissionId);
     if (sub) {
         sub.status = sub.type === 'proposal' ? 'revision_proposal_pending' : 'revision_skripsi_pending';
@@ -587,8 +621,32 @@ class MockDatabase {
     this.saveToStorage();
 
     if (firebaseDb) {
-        await updateDoc(doc(firebaseDb, 'schedules', scheduleId), { status: 'completed' });
+        await updateDoc(doc(firebaseDb, 'schedules', scheduleId), { status: 'completed', result: 'lulus' });
         if (sub) await updateDoc(doc(firebaseDb, 'submissions', sub.id), { status: sub.status });
+    }
+  }
+
+  // Mahasiswa dinyatakan tidak lulus. Jadwal dan pendaftaran TIDAK dihapus agar menjadi
+  // riwayat; mahasiswa lalu mendaftar ulang sebagai pendaftaran baru (lihat FormPage).
+  async failSchedule(scheduleId: string, reason: string): Promise<void> {
+    const schedule = this.schedules.find(s => s.id === scheduleId);
+    if (!schedule) return;
+
+    schedule.status = 'completed';
+    schedule.result = 'tidak_lulus';
+    schedule.failReason = reason;
+    const sub = this.submissions.find(s => s.id === schedule.submissionId);
+    const failedAt = new Date().toISOString();
+    if (sub) {
+        sub.status = 'failed';
+        sub.failedAt = failedAt;
+        sub.failReason = reason;
+    }
+    this.saveToStorage();
+
+    if (firebaseDb) {
+        await updateDoc(doc(firebaseDb, 'schedules', scheduleId), { status: 'completed', result: 'tidak_lulus', failReason: reason });
+        if (sub) await updateDoc(doc(firebaseDb, 'submissions', sub.id), { status: 'failed', failedAt, failReason: reason });
     }
   }
 
@@ -662,7 +720,8 @@ class MockDatabase {
   }
 
   async getStats() {
-      const all = await this.getSubmissions(); 
+      // Percobaan lama (tidak lulus) hanya riwayat, jangan ikut dihitung.
+      const all = latestAttemptsOnly(await this.getSubmissions()); 
       const schedules = await this.getSchedules();
       const students = await getAllStudents();
 

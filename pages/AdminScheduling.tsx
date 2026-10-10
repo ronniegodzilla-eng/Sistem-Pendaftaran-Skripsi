@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { db } from '../services/mockDb';
+import { db, getAttemptNumber } from '../services/mockDb';
+import { SubmissionHistory } from '../components/SubmissionHistory';
 import { Submission, Schedule, Student } from '../types';
 import { getStudentByNPM } from '../services/studentService';
 import { Calendar, AlertTriangle, User, Settings, Plus, X, CheckSquare, List, Loader2 } from 'lucide-react';
@@ -8,6 +9,7 @@ import { Calendar, AlertTriangle, User, Settings, Plus, X, CheckSquare, List, Lo
 export const AdminScheduling: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'queue' | 'scheduled'>('queue');
   const [readySubmissions, setReadySubmissions] = useState<Submission[]>([]);
+  const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
   const [existingSchedules, setExistingSchedules] = useState<Schedule[]>([]);
   const [availableRooms, setAvailableRooms] = useState<string[]>([]);
   
@@ -32,6 +34,7 @@ export const AdminScheduling: React.FC = () => {
     setLoading(true);
     const allSubs = await db.getSubmissions();
     const schedules = await db.getSchedules();
+    setAllSubmissions(allSubs);
     setReadySubmissions(allSubs.filter(s => s.status === 'validated'));
     setExistingSchedules(schedules);
     setAvailableRooms(await db.getRooms());
@@ -180,13 +183,32 @@ export const AdminScheduling: React.FC = () => {
 
   const handleResetSchedule = async () => {
       if (!selectedSchedule) return;
-      const reason = window.prompt("Masukkan alasan reset jadwal:", "Tidak Lulus / Ujian Ulang");
+      const reason = window.prompt("Masukkan alasan reset jadwal (untuk mahasiswa tidak lulus gunakan tombol \"Tidak Lulus\"):", "Pembatalan jadwal");
       if (!reason) return;
       
       setProcessing(true);
       await db.deleteSchedule(selectedSchedule.id, reason);
       alert('Jadwal berhasil direset.');
       
+      setSelectedSchedule(null);
+      setStudentDetails(null);
+      await refreshData();
+      setProcessing(false);
+  };
+
+  const handleFailExam = async () => {
+      if (!selectedSchedule) return;
+      const reason = window.prompt(`Mahasiswa ${selectedSchedule.studentName} dinyatakan TIDAK LULUS.\nMasukkan alasan / catatan penguji:`);
+      if (reason === null) return;
+      if (!reason.trim()) {
+          alert('Alasan tidak lulus wajib diisi.');
+          return;
+      }
+      setProcessing(true);
+
+      await db.failSchedule(selectedSchedule.id, reason.trim());
+      alert('Status mahasiswa: Tidak Lulus. Mahasiswa dapat mendaftar ulang; riwayat pendaftaran ini tetap tersimpan.');
+
       setSelectedSchedule(null);
       setStudentDetails(null);
       await refreshData();
@@ -236,7 +258,9 @@ export const AdminScheduling: React.FC = () => {
                         <div key={sub.id} onClick={() => { setSelectedSubmission(sub); setConflictError(null); }}
                             className={`p-4 cursor-pointer hover:bg-indigo-50 transition-colors ${selectedSubmission?.id === sub.id ? 'bg-indigo-50 border-l-4 border-indigo-500' : ''}`}>
                             <p className="font-medium text-slate-900">{sub.studentName}</p>
-                            <p className="text-xs text-slate-500">{sub.studentNpm} • <span className="uppercase">{sub.type}</span></p>
+                            <p className="text-xs text-slate-500">{sub.studentNpm} • <span className="uppercase">{sub.type}</span>
+                                {getAttemptNumber(sub) > 1 && <span className="ml-1 text-amber-700 font-semibold">• Ujian ulang ke-{getAttemptNumber(sub) - 1}</span>}
+                            </p>
                         </div>
                     ))
                 )}
@@ -252,7 +276,9 @@ export const AdminScheduling: React.FC = () => {
                             }`}>
                             <div className="flex justify-between items-start">
                                 <p className="font-medium text-slate-900">{sch.studentName}</p>
-                                {sch.status === 'completed' && <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">Selesai</span>}
+                                {sch.status === 'completed' && (sch.result === 'tidak_lulus'
+                                    ? <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded">Tidak Lulus</span>
+                                    : <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">Selesai</span>)}
                             </div>
                             <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
                                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${sch.status === 'completed' ? 'bg-slate-200 text-slate-600' : (sch.type === 'proposal' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700')}`}>
@@ -338,6 +364,8 @@ export const AdminScheduling: React.FC = () => {
                         </div>
                     )}
                     
+                    <SubmissionHistory current={selectedSubmission} submissions={allSubmissions} schedules={existingSchedules} />
+
                     <div className="mt-6 pt-4 border-t border-slate-100 flex justify-end">
                         <button type="button" onClick={handleSchedule} disabled={!date||!time||!endTime||!room || processing} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-medium shadow-sm transition-all disabled:opacity-50">
                             {processing ? <Loader2 className="animate-spin"/> : 'Simpan Jadwal'}
@@ -358,7 +386,9 @@ export const AdminScheduling: React.FC = () => {
                             {selectedSchedule.status === 'upcoming' && !isEditing && (
                                 <button onClick={() => setIsEditing(true)} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold hover:bg-indigo-200 transition-colors">Edit Jadwal</button>
                             )}
-                            {selectedSchedule.status === 'completed' && <span className="bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Selesai</span>}
+                            {selectedSchedule.status === 'completed' && (selectedSchedule.result === 'tidak_lulus'
+                                ? <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Tidak Lulus</span>
+                                : <span className="bg-slate-200 text-slate-700 px-3 py-1 rounded-full text-xs font-bold uppercase">Selesai</span>)}
                         </div>
                      </div>
 
@@ -423,17 +453,34 @@ export const AdminScheduling: React.FC = () => {
                                 <p className="text-sm text-purple-600 mb-4">Klik jika sidang selesai. Status mahasiswa akan dikirim ke Admin Pustaka untuk proses Revisi.</p>
                                 <button type="button" onClick={handlePassExam} className="bg-purple-600 text-white px-4 py-2 rounded shadow hover:bg-purple-700 active:scale-95 transform transition">Selesai Sidang</button>
                             </div>
+                            <div className="bg-amber-50 p-4 rounded-xl border border-amber-200 mb-4">
+                                <h3 className="text-amber-800 font-bold mb-2">Tidak Lulus</h3>
+                                <p className="text-sm text-amber-700 mb-4">Klik jika mahasiswa dinyatakan tidak lulus. Jadwal dan pendaftaran ini disimpan sebagai riwayat, lalu mahasiswa dapat mendaftar ulang.</p>
+                                <button type="button" onClick={handleFailExam} className="bg-amber-600 text-white px-4 py-2 rounded shadow hover:bg-amber-700 active:scale-95 transform transition">Tidak Lulus</button>
+                            </div>
                             <div className="bg-red-50 p-4 rounded-xl border border-red-100">
                                 <h3 className="text-red-800 font-bold mb-2">Reset Status / Batal</h3>
-                                <p className="text-sm text-red-600 mb-4">Kembalikan ke status Ditolak/Perlu Revisi (Jadwal dihapus permanen).</p>
+                                <p className="text-sm text-red-600 mb-4">Untuk kesalahan input atau pembatalan jadwal. Kembalikan ke status Ditolak/Perlu Revisi (Jadwal dihapus permanen, tidak tercatat di riwayat).</p>
                                 <button type="button" onClick={handleResetSchedule} className="bg-red-600 text-white px-4 py-2 rounded shadow hover:bg-red-700 active:scale-95 transform transition">Reset Jadwal</button>
                             </div>
                          </>
                      ) : (
-                         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-center text-slate-500 italic">
-                             Jadwal ini sudah selesai.
-                         </div>
+                         selectedSchedule.result === 'tidak_lulus' ? (
+                             <div className="bg-red-50 p-6 rounded-xl border border-red-200 text-center text-red-700">
+                                 Mahasiswa dinyatakan <b>tidak lulus</b> pada ujian ini.
+                                 {selectedSchedule.failReason && <div className="text-sm mt-1 italic">"{selectedSchedule.failReason}"</div>}
+                             </div>
+                         ) : (
+                             <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-center text-slate-500 italic">
+                                 Jadwal ini sudah selesai.
+                             </div>
+                         )
                      )}
+
+                     {(() => {
+                         const scheduleSub = allSubmissions.find(s => s.id === selectedSchedule.submissionId);
+                         return scheduleSub && <SubmissionHistory current={scheduleSub} submissions={allSubmissions} schedules={existingSchedules} />;
+                     })()}
                 </div>
             )}
         </div>

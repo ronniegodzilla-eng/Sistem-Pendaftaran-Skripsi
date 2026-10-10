@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { db } from '../services/mockDb';
-import { Submission } from '../types';
+import { db, getAttemptNumber } from '../services/mockDb';
+import { Schedule, Submission } from '../types';
+import { SubmissionHistory } from '../components/SubmissionHistory';
 import { Check, X, Eye, FileText, ChevronDown, ChevronUp, MessageSquare, RotateCcw, CheckCircle2, Loader2, Clock } from 'lucide-react';
 
 const NotesInput = ({ initialNotes, onSave }: { initialNotes: string, onSave: (notes: string) => void }) => {
@@ -30,6 +31,8 @@ const NotesInput = ({ initialNotes, onSave }: { initialNotes: string, onSave: (n
 
 export const AdminValidation: React.FC = () => {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [allSubmissions, setAllSubmissions] = useState<Submission[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -38,6 +41,7 @@ export const AdminValidation: React.FC = () => {
   const refreshData = async () => {
       setLoading(true);
       const all = await db.getSubmissions();
+      setAllSubmissions(all);
       // Filter out 'scheduled', 'passed', and revision statuses
       setSubmissions(all.filter(s => 
           s.status === 'pending' || 
@@ -58,6 +62,9 @@ export const AdminValidation: React.FC = () => {
       });
 
       setLoading(false);
+
+      // Hanya untuk panel riwayat ujian ulang; tidak perlu ditunggu.
+      db.getSchedules().then(setSchedules).catch(() => {});
   }
 
   useEffect(() => {
@@ -132,7 +139,9 @@ export const AdminValidation: React.FC = () => {
                               }`}></div>
                               <div>
                                   <h3 className="font-bold text-slate-900">{sub.studentName}</h3>
-                                  <p className="text-sm text-slate-500">{sub.studentNpm} • <span className="uppercase">{sub.type}</span></p>
+                                  <p className="text-sm text-slate-500">{sub.studentNpm} • <span className="uppercase">{sub.type}</span>
+                                      {getAttemptNumber(sub) > 1 && <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">Daftar Ulang (percobaan ke-{getAttemptNumber(sub)})</span>}
+                                  </p>
                                   <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
                                       <Clock size={12} /> {formatDateGMT7(sub.submittedAt)}
                                   </p>
@@ -219,6 +228,7 @@ export const AdminValidation: React.FC = () => {
                                       );
                                   })}
                               </div>
+                              <SubmissionHistory current={sub} submissions={allSubmissions} schedules={schedules} />
                               <div className="mt-4 flex justify-end">
                                   {sub.status === 'validated' && (
                                       <div className="text-green-600 font-bold flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">

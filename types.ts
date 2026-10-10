@@ -48,7 +48,8 @@ export type ApplicationStatus =
   | 'revision_proposal_pending' // Selesai Sempro -> Menunggu kumpul revisi manual
   | 'proposal_completed'        // Revisi Proposal Selesai -> Eligible Skripsi
   | 'revision_skripsi_pending'  // Selesai Sidang Skripsi -> Menunggu kumpul revisi manual
-  | 'skripsi_completed';        // Revisi Skripsi Selesai -> Eligible Yudisium
+  | 'skripsi_completed'         // Revisi Skripsi Selesai -> Eligible Yudisium
+  | 'failed';                   // Dinyatakan Tidak Lulus ujian -> boleh daftar ulang (pendaftaran baru)
 
 export interface Submission {
   id: string;
@@ -61,6 +62,11 @@ export interface Submission {
   status: ApplicationStatus;
   submittedAt: Date;
   academicYear?: string;
+  // Riwayat ujian ulang. Data lama tanpa field ini dianggap percobaan ke-1.
+  attempt?: number;              // Percobaan ke-berapa untuk tahap (type) ini
+  previousSubmissionId?: string; // Pendaftaran sebelumnya yang dinyatakan tidak lulus
+  failedAt?: string;             // ISO date saat dinyatakan tidak lulus
+  failReason?: string;
 }
 
 export interface Schedule {
@@ -79,6 +85,8 @@ export interface Schedule {
   penguji1: string;
   penguji2: string;
   status: 'upcoming' | 'completed'; // New field to track schedule completion
+  result?: 'lulus' | 'tidak_lulus';  // Hasil ujian, diisi saat jadwal diselesaikan
+  failReason?: string;
   academicYear?: string;
 }
 
