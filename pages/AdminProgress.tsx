@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../services/mockDb';
+import { db, pickLatestAttempt } from '../services/mockDb';
 import { getAllStudents } from '../services/studentService';
 import { Student, Submission } from '../types';
 import { Loader2, Search, FileDown, ChevronDown, ChevronUp, User } from 'lucide-react';
@@ -9,10 +9,12 @@ const PROGRESS_STAGES = [
   'Belum Mendaftar Proposal',
   'Sudah Mendaftar (Belum Terjadwal Proposal)',
   'Sudah Terjadwal Proposal',
+  'Tidak Lulus Proposal (Belum Daftar Ulang)',
   'Selesai Proposal (Belum Kumpul Revisi)',
   'Belum Mendaftar Skripsi',
   'Sudah Mendaftar (Belum Terjadwal Skripsi)',
   'Sudah Terjadwal Skripsi',
+  'Tidak Lulus Skripsi (Belum Daftar Ulang)',
   'Selesai Skripsi (Belum Kumpul Revisi)',
   'Tuntas (Selesai Semua)'
 ] as const;
@@ -31,6 +33,8 @@ export const AdminProgress: React.FC = () => {
     const [statsByProdi, setStatsByProdi] = useState<Record<string, ProdiStats>>({});
     const [expandedProdi, setExpandedProdi] = useState<string | null>(null);
     const [expandedStage, setExpandedStage] = useState<string | null>(null);
+    // Jumlah ujian tidak lulus per NPM (riwayat ujian ulang).
+    const [failCountByNpm, setFailCountByNpm] = useState<Record<string, { proposal: number; skripsi: number }>>({});
 
     useEffect(() => {
         const loadData = async () => {
@@ -71,6 +75,13 @@ export const AdminProgress: React.FC = () => {
                     prodiMap[prodi].studentsByStage[stage].push(student);
                 });
 
+                const failCounts: Record<string, { proposal: number; skripsi: number }> = {};
+                allSubmissions.filter(s => s.status === 'failed').forEach(s => {
+                    if (!failCounts[s.studentNpm]) failCounts[s.studentNpm] = { proposal: 0, skripsi: 0 };
+                    failCounts[s.studentNpm][s.type] += 1;
+                });
+                setFailCountByNpm(failCounts);
+
                 setStatsByProdi(prodiMap);
                 
                 // Expand first prodi by default if available
@@ -89,11 +100,13 @@ export const AdminProgress: React.FC = () => {
     }, []);
 
     const getStudentStage = (student: Student, submissions: Submission[]): ProgressStage => {
-        const sempro = submissions.find(s => s.type === 'proposal');
-        const skripsi = submissions.find(s => s.type === 'skripsi');
+        // Percobaan terakhir yang berlaku; percobaan lama yang tidak lulus hanya riwayat.
+        const sempro = pickLatestAttempt(submissions.filter(s => s.type === 'proposal'));
+        const skripsi = pickLatestAttempt(submissions.filter(s => s.type === 'skripsi'));
 
         if (skripsi) {
             if (skripsi.status === 'skripsi_completed') return 'Tuntas (Selesai Semua)';
+            if (skripsi.status === 'failed') return 'Tidak Lulus Skripsi (Belum Daftar Ulang)';
             if (skripsi.status === 'revision_skripsi_pending') return 'Selesai Skripsi (Belum Kumpul Revisi)';
             if (skripsi.status === 'scheduled') return 'Sudah Terjadwal Skripsi';
             return 'Sudah Mendaftar (Belum Terjadwal Skripsi)'; 
@@ -101,6 +114,7 @@ export const AdminProgress: React.FC = () => {
 
         if (sempro) {
             if (sempro.status === 'proposal_completed') return 'Belum Mendaftar Skripsi'; 
+            if (sempro.status === 'failed') return 'Tidak Lulus Proposal (Belum Daftar Ulang)';
             if (sempro.status === 'revision_proposal_pending') return 'Selesai Proposal (Belum Kumpul Revisi)';
             if (sempro.status === 'scheduled') return 'Sudah Terjadwal Proposal';
             return 'Sudah Mendaftar (Belum Terjadwal Proposal)'; 
@@ -121,11 +135,14 @@ export const AdminProgress: React.FC = () => {
             PROGRESS_STAGES.forEach(stage => {
                 const students = prodiStat.studentsByStage[stage];
                 students.forEach(student => {
+                    const fails = failCountByNpm[student.npm];
                     rows.push({
                         'NPM': student.npm,
                         'Nama': student.nama,
                         'Prodi': student.prodi,
                         'Tahap Progres': stage,
+                        'Tidak Lulus Proposal (kali)': fails?.proposal || 0,
+                        'Tidak Lulus Skripsi (kali)': fails?.skripsi || 0,
                     });
                 });
             });
@@ -230,6 +247,13 @@ export const AdminProgress: React.FC = () => {
                                                                             <div className="flex flex-col">
                                                                                 <span className="text-sm font-semibold text-slate-800">{s.nama}</span>
                                                                                 <span className="text-xs text-slate-500">{s.npm}</span>
+                                                                                {(failCountByNpm[s.npm]?.proposal > 0 || failCountByNpm[s.npm]?.skripsi > 0) && (
+                                                                                    <span className="text-xs text-amber-700">
+                                                                                        Riwayat tidak lulus:
+                                                                                        {failCountByNpm[s.npm].proposal > 0 && ` Proposal ${failCountByNpm[s.npm].proposal}x`}
+                                                                                        {failCountByNpm[s.npm].skripsi > 0 && ` Skripsi ${failCountByNpm[s.npm].skripsi}x`}
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         </li>
                                                                     ))}
