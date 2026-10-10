@@ -2,7 +2,7 @@
 import { Submission, Schedule, FileRequirement } from '../types';
 import { PROPOSAL_REQUIREMENTS, SKRIPSI_REQUIREMENTS, PROPOSAL_REVISION_REQUIREMENTS, SKRIPSI_REVISION_REQUIREMENTS } from '../constants';
 import { db as firebaseDb } from './firebase';
-import { collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, writeBatch } from 'firebase/firestore';
 import { getCached, invalidateCache, settingsKey, CACHE_KEYS, CACHE_TTL } from './cache';
 import { getAllStudents } from './studentService';
 
@@ -76,6 +76,21 @@ export const getFailCorrectionBlocker = (schedule: Schedule, submissions: Submis
     if (sub.type === 'proposal' && submissions.some(s => s.studentNpm === sub.studentNpm && s.type === 'skripsi')) {
         return 'Mahasiswa sudah mendaftar Sidang Skripsi. Batalkan pendaftaran skripsinya terlebih dahulu.';
     }
+    return null;
+};
+
+// Batalkan "Selesai Sidang" / "Tidak Lulus" yang terlanjur diklik: jadwal kembali aktif.
+// Mengembalikan alasan jika tidak boleh, atau null jika boleh.
+export const getRevertBlocker = (schedule: Schedule, submissions: Submission[]): string | null => {
+    const sub = submissions.find(s => s.id === schedule.submissionId);
+    if (!sub) return 'Data pendaftaran untuk jadwal ini tidak ditemukan.';
+    const latest = pickLatestAttempt(submissions.filter(s => s.studentNpm === sub.studentNpm && s.type === sub.type));
+    if (latest?.id !== sub.id) return 'Mahasiswa sudah mendaftar ulang setelah ujian ini.';
+    if (sub.status === 'proposal_completed' || sub.status === 'skripsi_completed') {
+        return 'Revisi sudah divalidasi Admin Pustaka, artinya ujian ini memang sudah selesai.';
+    }
+    const revertable = ['revision_proposal_pending', 'revision_skripsi_pending', 'failed'];
+    if (!revertable.includes(sub.status)) return `Status pendaftaran saat ini (${sub.status}) tidak dapat dikembalikan.`;
     return null;
 };
 
@@ -686,6 +701,27 @@ class MockDatabase {
     if (firebaseDb) {
         await deleteDoc(doc(firebaseDb, 'schedules', scheduleId));
         if (sub) await updateDoc(doc(firebaseDb, 'submissions', sub.id), { status: 'rejected', validations: sub.validations });
+    }
+  }
+
+  async revertSchedule(scheduleId: string): Promise<void> {
+    const schedule = this.schedules.find(s => s.id === scheduleId);
+    if (!schedule) return;
+
+    schedule.status = 'upcoming';
+    delete schedule.result;
+    delete schedule.failReason;
+    const sub = this.submissions.find(s => s.id === schedule.submissionId);
+    if (sub) {
+        sub.status = 'scheduled';
+        delete sub.failedAt;
+        delete sub.failReason;
+    }
+    this.saveToStorage();
+
+    if (firebaseDb) {
+        await updateDoc(doc(firebaseDb, 'schedules', scheduleId), { status: 'upcoming', result: deleteField(), failReason: deleteField() });
+        if (sub) await updateDoc(doc(firebaseDb, 'submissions', sub.id), { status: 'scheduled', failedAt: deleteField(), failReason: deleteField() });
     }
   }
 
