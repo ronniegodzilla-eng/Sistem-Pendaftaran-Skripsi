@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { db, getAttemptNumber, getFailCorrectionBlocker } from '../services/mockDb';
+import { db, getAttemptNumber, getFailCorrectionBlocker, getRevertBlocker } from '../services/mockDb';
 import { SubmissionHistory } from '../components/SubmissionHistory';
 import { Submission, Schedule, Student } from '../types';
 import { getStudentByNPM } from '../services/studentService';
@@ -218,6 +218,30 @@ export const AdminScheduling: React.FC = () => {
 
       await db.failSchedule(selectedSchedule.id, reason.trim());
       alert('Status mahasiswa: Tidak Lulus. Mahasiswa dapat mendaftar ulang; riwayat pendaftaran ini tetap tersimpan.');
+
+      setSelectedSchedule(null);
+      setStudentDetails(null);
+      await refreshData();
+      setProcessing(false);
+  };
+
+  const handleRevertSchedule = async () => {
+      if (!selectedSchedule) return;
+      // Data bisa berubah sejak halaman dimuat; cek ulang dengan data terbaru.
+      const blocker = getRevertBlocker(selectedSchedule, await db.getSubmissions(true));
+      if (blocker) {
+          alert(blocker);
+          return;
+      }
+      if (!confirm(`Kembalikan jadwal ${selectedSchedule.studentName} ke status Terjadwal?\nHasil ujian yang sudah diinput akan dibatalkan.`)) return;
+
+      // Jadwal yang sudah selesai tidak ikut dicek bentrok, jadi slotnya mungkin sudah dipakai.
+      const conflict = await db.checkConflict({ ...selectedSchedule, status: 'upcoming' });
+      if (conflict && !confirm(`${conflict}\n\nTetap kembalikan ke Terjadwal? Ubah jadwalnya setelah ini.`)) return;
+
+      setProcessing(true);
+      await db.revertSchedule(selectedSchedule.id);
+      alert('Jadwal dikembalikan ke status Terjadwal.');
 
       setSelectedSchedule(null);
       setStudentDetails(null);
@@ -502,6 +526,21 @@ export const AdminScheduling: React.FC = () => {
                              </>
                          )
                      )}
+
+                     {selectedSchedule.status === 'completed' && (() => {
+                         const blocker = getRevertBlocker(selectedSchedule, allSubmissions);
+                         return (
+                             <div className="mt-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                                 <h3 className="text-slate-800 font-bold mb-2">Koreksi: Kembalikan ke Terjadwal</h3>
+                                 <p className="text-sm text-slate-600 mb-4">Gunakan jika "Selesai Sidang" atau "Tidak Lulus" tidak sengaja diklik. Jadwal kembali aktif dan hasil ujian dibatalkan.</p>
+                                 {blocker ? (
+                                     <p className="text-sm text-slate-600 italic">Tidak dapat dikembalikan: {blocker}</p>
+                                 ) : (
+                                     <button type="button" onClick={handleRevertSchedule} className="bg-slate-700 text-white px-4 py-2 rounded shadow hover:bg-slate-800 active:scale-95 transform transition">Kembalikan ke Terjadwal</button>
+                                 )}
+                             </div>
+                         );
+                     })()}
 
                      {(() => {
                          const scheduleSub = allSubmissions.find(s => s.id === selectedSchedule.submissionId);
