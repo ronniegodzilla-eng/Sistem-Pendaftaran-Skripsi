@@ -64,6 +64,21 @@ export const latestAttemptsOnly = (subs: Submission[]): Submission[] => {
     return subs.filter(s => latest.get(`${s.studentNpm}|${s.type}`) === s);
 };
 
+// Koreksi jadwal yang terlanjur ditandai "Selesai Sidang" menjadi tidak lulus.
+// Mengembalikan alasan jika tidak boleh dikoreksi, atau null jika boleh.
+export const getFailCorrectionBlocker = (schedule: Schedule, submissions: Submission[]): string | null => {
+    const sub = submissions.find(s => s.id === schedule.submissionId);
+    if (!sub) return 'Data pendaftaran untuk jadwal ini tidak ditemukan.';
+    const latest = pickLatestAttempt(submissions.filter(s => s.studentNpm === sub.studentNpm && s.type === sub.type));
+    if (latest?.id !== sub.id) return 'Mahasiswa sudah mendaftar ulang setelah ujian ini.';
+    const correctable = ['revision_proposal_pending', 'revision_skripsi_pending', 'proposal_completed', 'skripsi_completed'];
+    if (!correctable.includes(sub.status)) return `Status pendaftaran saat ini (${sub.status}) tidak dapat dikoreksi.`;
+    if (sub.type === 'proposal' && submissions.some(s => s.studentNpm === sub.studentNpm && s.type === 'skripsi')) {
+        return 'Mahasiswa sudah mendaftar Sidang Skripsi. Batalkan pendaftaran skripsinya terlebih dahulu.';
+    }
+    return null;
+};
+
 class MockDatabase {
   private submissions: Submission[] = [];
   private schedules: Schedule[] = [];

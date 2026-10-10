@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { db, getAttemptNumber } from '../services/mockDb';
+import { db, getAttemptNumber, getFailCorrectionBlocker } from '../services/mockDb';
 import { SubmissionHistory } from '../components/SubmissionHistory';
 import { Submission, Schedule, Student } from '../types';
 import { getStudentByNPM } from '../services/studentService';
@@ -198,6 +198,16 @@ export const AdminScheduling: React.FC = () => {
 
   const handleFailExam = async () => {
       if (!selectedSchedule) return;
+      const isCorrection = selectedSchedule.status === 'completed';
+      if (isCorrection) {
+          // Data bisa berubah sejak halaman dimuat; cek ulang dengan data terbaru.
+          const blocker = getFailCorrectionBlocker(selectedSchedule, await db.getSubmissions(true));
+          if (blocker) {
+              alert(blocker);
+              return;
+          }
+          if (!confirm(`Ujian ${selectedSchedule.studentName} sudah ditandai "Selesai Sidang".\nUbah hasilnya menjadi TIDAK LULUS? Proses revisi mahasiswa akan dibatalkan.`)) return;
+      }
       const reason = window.prompt(`Mahasiswa ${selectedSchedule.studentName} dinyatakan TIDAK LULUS.\nMasukkan alasan / catatan penguji:`);
       if (reason === null) return;
       if (!reason.trim()) {
@@ -471,9 +481,25 @@ export const AdminScheduling: React.FC = () => {
                                  {selectedSchedule.failReason && <div className="text-sm mt-1 italic">"{selectedSchedule.failReason}"</div>}
                              </div>
                          ) : (
-                             <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-center text-slate-500 italic">
-                                 Jadwal ini sudah selesai.
-                             </div>
+                             <>
+                                 <div className="bg-slate-50 p-6 rounded-xl border border-slate-200 text-center text-slate-500 italic">
+                                     Jadwal ini sudah selesai.
+                                 </div>
+                                 {selectedSchedule.status === 'completed' && (() => {
+                                     const blocker = getFailCorrectionBlocker(selectedSchedule, allSubmissions);
+                                     return (
+                                         <div className="mt-4 bg-amber-50 p-4 rounded-xl border border-amber-200">
+                                             <h3 className="text-amber-800 font-bold mb-2">Koreksi: Ubah ke Tidak Lulus</h3>
+                                             <p className="text-sm text-amber-700 mb-4">Gunakan jika ujian ini terlanjur ditandai "Selesai Sidang" padahal mahasiswa dinyatakan tidak lulus. Proses revisinya dibatalkan, mahasiswa dapat mendaftar ulang, dan berkas revisi yang sudah diupload tetap tersimpan di riwayat.</p>
+                                             {blocker ? (
+                                                 <p className="text-sm text-slate-600 italic">Tidak dapat dikoreksi: {blocker}</p>
+                                             ) : (
+                                                 <button type="button" onClick={handleFailExam} className="bg-amber-600 text-white px-4 py-2 rounded shadow hover:bg-amber-700 active:scale-95 transform transition">Ubah ke Tidak Lulus</button>
+                                             )}
+                                         </div>
+                                     );
+                                 })()}
+                             </>
                          )
                      )}
 
